@@ -1,0 +1,52 @@
+OASISFormat: 0.4
+Name:        e2lang
+Version:     0.1
+Synopsis:    An embedded language for differential-algebraic equations
+Authors:     Christoph Höger <christoph.hoeger@tu-berlin.de>
+License:     BSD-3-clause
+BuildTools:  ocamlbuild
+Plugins:     META (0.4), StdFiles (0.4), DevFiles (0.4)
+
+# for corebuild compatibility:
+AlphaFeatures:           ocamlbuild_more_args
+XOCamlbuildExtraArgs:    -j 4 -verbose 0 -tag thread -tag debug -tag annot -tag bin_annot -tag short_paths 
+
+Library e2lang
+  Path:       src
+  BuildTools:   ocamlbuild
+  Modules:      E2lang, E2link, E2intpr, E2pretty, E2poly
+  BuildDepends: smart_print
+  
+Executable e2bench
+  Path:       src
+  CompiledObject: best
+  BuildTools: ocamlbuild
+  BuildDepends: e2lang, core, core_bench
+  CCLib:        -ltnp
+  DllLib:	libtnp
+  MainIs: e2bench.ml
+
+Document "api-e2lang"
+  Title: API reference for e2lang
+  Type: OCamlbuild (0.3)
+  Install: true
+  InstallDir: $htmldir/oasis
+  BuildTools: ocamldoc
+  XOCamlbuildPath: src/
+  XOCamlbuildLibraries: e2lang
+  XOCamlbuildExtraArgs:    -j 4 -verbose 0 -tag thread -tag debug -tag annot -tag bin_annot -tag short_paths 
+
+
+Executable e2tests
+  Path: src
+  CompiledObject: best
+  MainIs: e2test.ml
+  Install: false
+  Build$: flag(tests)  
+  CCLib:        -ltnp
+  DllLib:	libtnp
+  BuildDepends: e2lang, kaputt
+
+Test e2test
+  Type: custom (0.3)
+  Command: $e2tests
