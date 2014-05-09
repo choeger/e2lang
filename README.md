@@ -24,6 +24,8 @@ You can install the OCaml dependencies running:
 Building
 --------
 
+Build and install libtnp first (see https://github.com/AMSUN-Berlin/libtnp/blob/master/README.md )
+
 Run the following commands:
 
 ```sh
