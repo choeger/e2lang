@@ -1,7 +1,7 @@
 e2lang
 ======
 
-e2l is the *e*mbedded *e*quation *l*anguage. 
+e2l is the **e** mbedded **e** quation **l** anguage. 
 
 It's purpose is to provide a simple language for automatic differentiation and JIT code generation in variable-structure DAE simulation environments.
 
