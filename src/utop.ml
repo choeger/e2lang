@@ -1,5 +1,5 @@
 #require "smart_print" ;;
-#directory "_build" ;;
+#directory "_build/src" ;;
 #load "e2lang.cmo" ;;
 #load "e2poly.cmo" ;;
 #load "e2pretty.cmo" ;;

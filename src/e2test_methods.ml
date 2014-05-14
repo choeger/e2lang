@@ -79,11 +79,14 @@ let test_polynomials = [
   Variable(0, 2, Number(1.0), [Variable(1, 2, Number(1.0), [])] ) ; (* x² + y² *)  
 ]
 
+let poly1 = poly_to_e2 (List.nth test_polynomials 0) 1
+
 let test_proc = Proc(test_proto, test_program)
 
 let faculty_proc = Proc(fac_proto, test_fac)
 
-let procedures = (StrMap.add "test" test_proc
+let procedures = StrMap.add "poly1" poly1
+                             (StrMap.add "test" test_proc
 			     (StrMap.add "fac" faculty_proc empty_procs))
 
 
@@ -94,11 +97,15 @@ let test_methods = link procedures
 let test_method = StrMap.find "test" test_methods
 
 let fac_method = StrMap.find "fac" test_methods
+
+let poly1_method = StrMap.find "poly1" test_methods
 		
 (* evaluate them *)
 let eval_test () = eval_method meta test_method [||]
 
 let eval_fac n = eval_method meta fac_method [| IVal n |]
+
+let eval_poly1 f = eval_method meta poly1_method [| FVal f |]
 
 (* for comparison: faculty function in haskell *)
 let rec fac = function

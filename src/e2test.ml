@@ -27,6 +27,7 @@
  *)
 open E2test_methods
 open E2lang
+open E2poly
 open Kaputt.Abbreviations
 
 (** Output provider for test results (to see the actual result if something went wrong *)
@@ -60,6 +61,10 @@ let () =
   Test.add_simple_test
     ~title:"fac(2)"
     (fun () -> Assert.equal ~prn:print_val (IVal 2) (eval_fac 2));
+
+  Test.add_simple_test
+    ~title:"poly1(0.1)"
+    (fun () -> Assert.equal ~prn:print_val (FVal (eval_poly [|0.1|] (List.nth test_polynomials 0))) (eval_poly1 0.1));
   
   (* test a whole specification by enumerating over several inputs *)
   Test.add_enum_test
