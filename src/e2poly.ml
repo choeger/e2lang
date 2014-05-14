@@ -141,37 +141,19 @@ and simplify = function
 let rec simplify_fix p = let s = simplify p in if s = p then p else simplify_fix s
 
 
-type 'a state = int -> 'a * int
-
-let return a = fun c -> (a, c)
-let (>>=) st f = fun c -> match st c with (v, c') -> f v c'
-let get = fun c -> (c, c)
-let put c' = fun c -> ((), c')
-
-let freshVar =
-    get >>= fun c ->
-    put (c+1) >>= fun _ ->
-    return c
-
-let lastVar =
-    get >>= fun c ->
-    return (c-1)
-
-let buildPow i n c =
+let pow_to_e2 i n c =
     let rec pow i n c =
         if n = 0
         then [| |]
         else Array.append [| Store (FArg c, FMul (FloatVar i, FloatVar c)) |] (pow i (n-1) c)
     in
-    (*freshVar >>= fun c ->*)
     Array.append [| Store (FArg c, FCopy (FloatLit 1.0))|] (pow i n c)
 
-let rec polyToE2l c = function
+let rec poly_to_e2_stmts c = function
     | Number f -> ([| Store (FArg c, FCopy (FloatLit f)) |], c+1)
-    (*freshVar >>= fun c -> return [| Store (FArg c, FCopy (FloatLit f)) |]*)
     | Variable (i, n, p, qs) ->
-            let powArr = buildPow i n c in
-            match polyToE2l (c+1) p with
+            let powArr = pow_to_e2 i n c in
+            match poly_to_e2_stmts (c+1) p with
             | (pArr, c') ->
                     let multArr = [| Store (FArg c', FMul (FloatVar c, FloatVar (c'-1))) |] in
                     let firstArr = Array.concat [powArr; pArr; multArr] in
@@ -183,7 +165,7 @@ let rec polyToE2l c = function
 and build_sum c = function
     | [] -> ([| Store (FArg c, FCopy (FloatLit 0.) )|], c+1)
     | p :: ps ->
-            match (polyToE2l c p) with
+            match (poly_to_e2_stmts c p) with
             | (pArr, c') ->
                     match build_sum c' ps with
                     | (psArr, c'') ->
@@ -198,7 +180,7 @@ and build_sum c = function
 
 let poly_to_e2 p n =
     let rec argList m n = if m == n then [FArg n] else (FArg m) :: (argList (m+1) n) in
-    match polyToE2l n p with
+    match poly_to_e2_stmts n p with
     | (stmts, cnt) ->
             let argArr = Array.of_list (argList 0 (n-1)) in
             let proto = { ivars = 0; bvars = 0; dvars = 0; fvars = cnt; args = argArr; ret=FRet } in

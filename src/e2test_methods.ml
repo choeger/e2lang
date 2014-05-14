@@ -79,15 +79,26 @@ let test_polynomials = [
   Variable(0, 2, Number(1.0), [Variable(1, 2, Number(1.0), [])] ) ; (* x² + y² *)  
 ]
 
-let poly1 = poly_to_e2 (List.nth test_polynomials 0) 1
+let poly1 = Variable(0, 2, Number(1.0), [])
+let poly2 = Variable(0, 2, Number(1.0), [Variable(1, 2, Number(1.0), [])])
+let poly3 = Variable(0, 2, Variable(2, 3, Number(1.0), []), [Variable(0, 1, Variable(1, 1, Number(1.0), []), [])])
+let poly4 = Variable(0, 3, Variable(1, 2, Variable(0, 2, Variable(1, 2, Number(1.0), []), []), []), [])
+
+let poly1_proc = poly_to_e2 poly1 1
+let poly2_proc = poly_to_e2 poly2 2
+let poly3_proc = poly_to_e2 poly3 3
+let poly4_proc = poly_to_e2 poly4 2
 
 let test_proc = Proc(test_proto, test_program)
 
 let faculty_proc = Proc(fac_proto, test_fac)
 
-let procedures = StrMap.add "poly1" poly1
-                             (StrMap.add "test" test_proc
-			     (StrMap.add "fac" faculty_proc empty_procs))
+let procedures =  StrMap.add "poly1" poly1_proc
+                 (StrMap.add "poly2" poly2_proc
+                 (StrMap.add "poly3" poly3_proc
+                 (StrMap.add "poly4" poly4_proc
+                 (StrMap.add "test" test_proc
+			     (StrMap.add "fac" faculty_proc empty_procs)))))
 
 
 (* call the linker *)
@@ -99,6 +110,9 @@ let test_method = StrMap.find "test" test_methods
 let fac_method = StrMap.find "fac" test_methods
 
 let poly1_method = StrMap.find "poly1" test_methods
+let poly2_method = StrMap.find "poly2" test_methods
+let poly3_method = StrMap.find "poly3" test_methods
+let poly4_method = StrMap.find "poly4" test_methods
 		
 (* evaluate them *)
 let eval_test () = eval_method meta test_method [||]
@@ -106,6 +120,9 @@ let eval_test () = eval_method meta test_method [||]
 let eval_fac n = eval_method meta fac_method [| IVal n |]
 
 let eval_poly1 f = eval_method meta poly1_method [| FVal f |]
+let eval_poly2 f1 f2 = eval_method meta poly2_method [| FVal f1; FVal f2 |]
+let eval_poly3 f1 f2 f3 = eval_method meta poly3_method [| FVal f1; FVal f2; FVal f3 |]
+let eval_poly4 f1 f2 = eval_method meta poly4_method [| FVal f1; FVal f2 |]
 
 (* for comparison: faculty function in haskell *)
 let rec fac = function
