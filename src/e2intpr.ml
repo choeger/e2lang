@@ -149,10 +149,10 @@ and eval meta state stmts i = match stmts.(i) with
   | Store((DArg var), DAdd (x, y)) -> tnp_add meta.params meta.order state.der_vars.(var) state.der_vars.(x) state.der_vars.(y) ; eval meta state stmts (i+1)
 
   (* Exec of float instructions *)
-  | Store((IArg var), FAdd (x, y)) -> state.float_vars.(var) <- ((float state x) +. (float state y)) ; eval meta state stmts (i+1)
-  | Store((IArg var), FMul (x, y)) -> state.float_vars.(var) <- ((float state x) *. (float state y)) ; eval meta state stmts (i+1)
-  | Store((IArg var), FCopy f)     -> state.float_vars.(var) <- (float state f) ; eval meta state stmts (i+1)
-  | Store((IArg var), FCopyI n)    -> state.float_vars.(var) <- float_of_int (int state n) ; eval meta state stmts (i+1)
+  | Store((FArg var), FAdd (x, y)) -> state.float_vars.(var) <- ((float state x) +. (float state y)) ; eval meta state stmts (i+1)
+  | Store((FArg var), FMul (x, y)) -> state.float_vars.(var) <- ((float state x) *. (float state y)) ; eval meta state stmts (i+1)
+  | Store((FArg var), FCopy f)     -> state.float_vars.(var) <- (float state f) ; eval meta state stmts (i+1)
+  | Store((FArg var), FCopyI n)    -> state.float_vars.(var) <- float_of_int (int state n) ; eval meta state stmts (i+1)
 
   (* Exec of int instructions *)
   | Store((BArg var), IEquals (x, y)) -> state.bool_vars.(var) <- ((int state x) = (int state y)) ; eval meta state stmts (i+1)
