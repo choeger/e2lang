@@ -14,7 +14,7 @@ type bblock = {
 
 let rec build_blocks name stmts = function
     (si, ei) ->
-        if ei > Array.length(stmts)
+        if ei >= Array.length(stmts)
         then
             [{name = name; start_pos = si; end_pos = ei; next = NoBlock}]
         else
@@ -30,7 +30,7 @@ let rec build_blocks name stmts = function
             | CJmp (str, cond) -> 
                     let new_name = "after CJump" ^ name in
                         let nb = build_blocks new_name stmts (ei+1, ei+1) in
-                        {name = name; start_pos = si; end_pos = ei+1; next = OneBlock str}::nb
+                        {name = name; start_pos = si; end_pos = ei+1; next = TwoBlocks (new_name,str)}::nb
             | Ret arg -> 
                     let new_name = "after returning" ^ name in
                         let nb = build_blocks new_name stmts (ei+1, ei+1) in
