@@ -213,5 +213,36 @@ let build_stmt vt jit = function
     | Ret (BArg var) -> ignore (build_ret vt.local_bool_vars.(var) jit.builder)
     | _ -> ()
 
-(*let build_bb vt jit bb stmts si ei =
-    if si < ei then build_stmt stmts.(si); build_bb vt jit bb stmts (si+1) ei else ()*)
+let build_stmts vt jit bb = 
+    Array.iter ( build_stmt vt jit ) bb.stmts
+
+let build_new_block vt jit bb f =
+    let new_block = append_block jit.jit_context bb.name f in
+    position_at_end new_block jit.builder;
+    build_stmts vt jit bb;
+    StrMap.add bb.name new_block
+
+let build_llvm_blocks vt jit blist f =
+    List.fold_left (fun map bb -> build_new_block vt jit bb f map) StrMap.empty blist
+
+let build_function jit blist proto name = 
+    let vt = build_local_vars proto jit in
+    let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
+    let f = declare_function name ft jit.the_module 
+(*    let map = build_llvm_blocks vt jit blist f in *)
+        
+
+
+
+
+
+
+
+
+
+
+
+     
+
+
+
