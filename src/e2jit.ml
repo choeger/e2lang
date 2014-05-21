@@ -138,6 +138,7 @@ let llvm_rettype jit = function
   | FRet -> jit.double_type
   | BRet -> jit.bool_type
 
+(* generation *)
 let build_int_value vt jit = function
     | IntLit n -> const_int jit.int_type n
     | IntVar c -> vt.local_int_vars.(c)
@@ -150,42 +151,32 @@ let build_bool_value vt jit = function
     | BoolLit b -> const_int jit.bool_type (if b then 1 else 0)
     | BoolVar c -> vt.local_bool_vars.(c)
 
+let build_binary_expr f tf v1 v2 str vt jit =
+    let tv1 = tf vt jit v1 in
+    let tv2 = tf vt jit v2 in
+    f tv1 tv2 str jit.builder
+
+let build_int_expr f = 
+    build_binary_expr f build_int_value
+let build_float_expr f =
+    build_binary_expr f build_float_value
+let build_bool_expr f =
+    build_binary_expr f build_bool_value
+
 let build_expr vt jit = function
-    | FAdd (a1, a2) -> 
-            let b1 = build_float_value vt jit a1 in
-            let b2 = build_float_value vt jit a2 in
-            build_fadd b1 b2 "fadd_tmp" jit.builder 
-    | FMul (a1, a2) -> 
-            let b1 = build_float_value vt jit a1 in
-            let b2 = build_float_value vt jit a2 in
-            build_fmul b1 b2 "fmul_tmp" jit.builder 
+    | FAdd (a1, a2)     -> build_float_expr build_fadd a1 a2 "fadd_tmp" vt jit
+    | FMul (a1, a2)     -> build_float_expr build_fmul a1 a2 "fmul_tmp" vt jit
     | FCopyI a -> 
             let b = build_int_value vt jit a in
             build_sitofp b jit.double_type "int_to_float" jit.builder
     | FCopy a -> build_float_value vt jit a
-    | IAdd (a1, a2) -> 
-            let b1 = build_int_value vt jit a1 in
-            let b2 = build_int_value vt jit a2 in
-            build_add b1 b2 "iadd_tmp" jit.builder
-    | IEquals (a1, a2) -> 
-            let b1 = build_int_value vt jit a1 in
-            let b2 = build_int_value vt jit a2 in
-            build_icmp Icmp.Eq b1 b2 "compare_int" jit.builder
-    | IMul (a1, a2) -> 
-            let b1 = build_int_value vt jit a1 in
-            let b2 = build_int_value vt jit a2 in
-            build_mul b1 b2 "imul_tmp" jit.builder 
-    | ICopyB a -> 
-            build_bool_value vt jit a
-    | ICopy a -> build_int_value vt jit a
-    | BAnd (a1, a2) -> 
-            let b1 = build_bool_value vt jit a1 in
-            let b2 = build_bool_value vt jit a2 in
-            build_and b1 b2 "bool_and" jit.builder  
-    | BOr (a1, a2) ->
-            let b1 = build_bool_value vt jit a1 in
-            let b2 = build_bool_value vt jit a2 in
-            build_or b1 b2 "bool_or" jit.builder  
+    | IAdd (a1, a2)    -> build_int_expr build_add a1 a2 "iadd_tmp" vt jit
+    | IEquals (a1, a2) -> build_int_expr (build_icmp Icmp.Eq) a1 a2 "icomp_tmp" vt jit
+    | IMul (a1, a2)    -> build_int_expr build_mul a1 a2 "imul_tmp" vt jit 
+    | ICopyB a         -> build_bool_value vt jit a
+    | ICopy a          -> build_int_value vt jit a
+    | BAnd (a1, a2)    -> build_bool_expr build_and a1 a2 "band_tmp" vt jit
+    | BOr (a1, a2)     -> build_bool_expr build_or a1 a2 "bor_tmp" vt jit
     | BNot a -> 
             let b = build_bool_value vt jit a in
             build_not b "bool_not" jit.builder
@@ -207,3 +198,6 @@ let build_expr vt jit = function
             let arg = Array.map map_args args in (* new array with llvm values *)
             build_call callee arg "call_function" jit.builder 
 
+(*let build_stmt vt jit = function
+    | Store (arg, expr) ->
+            let llvexpr = build_expr vt jit expr in*)
