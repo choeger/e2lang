@@ -150,5 +150,60 @@ let build_bool_value vt jit = function
     | BoolLit b -> const_int jit.bool_type (if b then 1 else 0)
     | BoolVar c -> vt.local_bool_vars.(c)
 
-(*let build_expr vt jit = function
-    | FAdd (a1, a2) -> build_fmul *)
+let build_expr vt jit = function
+    | FAdd (a1, a2) -> 
+            let b1 = build_float_value vt jit a1 in
+            let b2 = build_float_value vt jit a2 in
+            build_fadd b1 b2 "fadd_tmp" jit.builder 
+    | FMul (a1, a2) -> 
+            let b1 = build_float_value vt jit a1 in
+            let b2 = build_float_value vt jit a2 in
+            build_fmul b1 b2 "fmul_tmp" jit.builder 
+    | FCopyI a -> 
+            let b = build_int_value vt jit a in
+            build_sitofp b jit.double_type "int_to_float" jit.builder
+    | FCopy a -> build_float_value vt jit a
+    | IAdd (a1, a2) -> 
+            let b1 = build_int_value vt jit a1 in
+            let b2 = build_int_value vt jit a2 in
+            build_add b1 b2 "iadd_tmp" jit.builder
+    | IEquals (a1, a2) -> 
+            let b1 = build_int_value vt jit a1 in
+            let b2 = build_int_value vt jit a2 in
+            build_icmp Icmp.Eq b1 b2 "compare_int" jit.builder
+    | IMul (a1, a2) -> 
+            let b1 = build_int_value vt jit a1 in
+            let b2 = build_int_value vt jit a2 in
+            build_mul b1 b2 "imul_tmp" jit.builder 
+    | ICopyB a -> 
+            build_bool_value vt jit a
+    | ICopy a -> build_int_value vt jit a
+    | BAnd (a1, a2) -> 
+            let b1 = build_bool_value vt jit a1 in
+            let b2 = build_bool_value vt jit a2 in
+            build_and b1 b2 "bool_and" jit.builder  
+    | BOr (a1, a2) ->
+            let b1 = build_bool_value vt jit a1 in
+            let b2 = build_bool_value vt jit a2 in
+            build_or b1 b2 "bool_or" jit.builder  
+    | BNot a -> 
+            let b = build_bool_value vt jit a in
+            build_not b "bool_not" jit.builder
+    | BCopy a -> build_bool_value vt jit a
+    | Call (name,args) -> 
+            let callee =
+                match lookup_function name jit.the_module with
+                | Some callee -> callee (* contains the llvm value of the function *) 
+                | None -> raise (Error "unknown function")
+            in
+            let params = params callee in
+            if Array.length params == Array.length args then () else
+                raise (Error "incorrect number of arguments");
+            let map_args = function (* transform variables in llvm values *)
+                | IArg a -> vt.local_int_vars.(a)
+                | FArg a -> vt.local_float_vars.(a)
+                | BArg a -> vt.local_bool_vars.(a)  
+            in
+            let arg = Array.map map_args args in (* new array with llvm values *)
+            build_call callee arg "call_function" jit.builder 
+
