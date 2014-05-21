@@ -138,3 +138,17 @@ let llvm_rettype jit = function
   | FRet -> jit.double_type
   | BRet -> jit.bool_type
 
+let build_int_value vt jit = function
+    | IntLit n -> const_int jit.int_type n
+    | IntVar c -> vt.local_int_vars.(c)
+
+let build_float_value vt jit = function
+    | FloatLit f -> const_float jit.double_type f
+    | FloatVar c -> vt.local_float_vars.(c)
+
+let build_bool_value vt jit = function
+    | BoolLit b -> const_int jit.bool_type (if b then 1 else 0)
+    | BoolVar c -> vt.local_bool_vars.(c)
+
+(*let build_expr vt jit = function
+    | FAdd (a1, a2) -> build_fmul *)
