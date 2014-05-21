@@ -26,6 +26,7 @@
  *
  *)
 open E2lang
+open E2basicblock
 
 open Llvm
 open Llvm_executionengine
@@ -225,24 +226,11 @@ let build_new_block vt jit bb f =
 let build_llvm_blocks vt jit blist f =
     List.fold_left (fun map bb -> build_new_block vt jit bb f map) StrMap.empty blist
 
+(* TODO: finish up *)
 let build_function jit blist proto name = 
     let vt = build_local_vars proto jit in
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
-    let f = declare_function name ft jit.the_module 
-(*    let map = build_llvm_blocks vt jit blist f in *)
-        
-
-
-
-
-
-
-
-
-
-
-
-     
-
-
+    let f = declare_function name ft jit.the_module in
+    let map = build_llvm_blocks vt jit blist f in
+    ()
 

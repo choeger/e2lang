@@ -17,23 +17,25 @@ let rec build_blocks name stmts = function
     (si, ei) ->
         if ei >= Array.length(stmts)
         then
-            [{name = name; stmts = Array.sub stmts si (ei - si); next = NoBlock}]
+            if si = ei then [] else [{name = name; stmts = Array.sub stmts si (ei - si); next = NoBlock}]
         else
             match stmts.(ei) with
             | Label str ->
-                    let lblname = "$lbl$" ^ str in
+                    let lblname = "lbl$" ^ str in
                     let nb = build_blocks lblname stmts (ei+1, ei+1) in
                     {name = name; stmts = Array.sub stmts si (ei - si); next = OneBlock lblname} :: nb
             | Jmp str ->
-                    let new_name = "after Jump" ^ name in
+                    let new_name = "postj$" ^ name in
+                    let lblname = "lbl$" ^ str in
                     let nb = build_blocks new_name stmts (ei+1, ei+1) in
-                    {name = name; stmts = Array.sub stmts si (ei - si); next = OneBlock str}::nb
+                    {name = name; stmts = Array.sub stmts si (ei - si); next = OneBlock lblname}::nb
             | CJmp (str, cond) -> 
-                    let new_name = "after CJump" ^ name in
+                    let new_name = "postcj$" ^ name in
+                    let lblname = "lbl$" ^ str in
                     let nb = build_blocks new_name stmts (ei+1, ei+1) in
-                    {name = name; stmts = Array.sub stmts si (ei - si); next = CondBlocks (cond, new_name,str)}::nb
+                    {name = name; stmts = Array.sub stmts si (ei - si); next = CondBlocks (cond, new_name, lblname)}::nb
             | Ret arg -> 
-                    let new_name = "after returning" ^ name in
+                    let new_name = "postret$" ^ name in
                     let nb = build_blocks new_name stmts (ei+1, ei+1) in
                     {name = name; stmts = Array.sub stmts si (ei - si + 1); next = NoBlock}::nb
             | _ -> build_blocks name stmts (si, ei + 1)
