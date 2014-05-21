@@ -198,6 +198,20 @@ let build_expr vt jit = function
             let arg = Array.map map_args args in (* new array with llvm values *)
             build_call callee arg "call_function" jit.builder 
 
-(*let build_stmt vt jit = function
-    | Store (arg, expr) ->
-            let llvexpr = build_expr vt jit expr in*)
+let build_stmt vt jit = function
+    | Store (FArg var, expr) ->
+            let llvexpr = build_expr vt jit expr in
+            ignore (build_store vt.local_float_vars.(var) llvexpr jit.builder)
+    | Store (IArg var, expr) ->
+            let llvexpr = build_expr vt jit expr in
+            ignore (build_store vt.local_int_vars.(var) llvexpr jit.builder)
+    | Store (BArg var, expr) ->
+            let llvexpr = build_expr vt jit expr in
+            ignore (build_store vt.local_bool_vars.(var) llvexpr jit.builder)
+    | Ret (FArg var) -> ignore (build_ret vt.local_float_vars.(var) jit.builder)
+    | Ret (IArg var) -> ignore (build_ret vt.local_int_vars.(var) jit.builder)
+    | Ret (BArg var) -> ignore (build_ret vt.local_bool_vars.(var) jit.builder)
+    | _ -> ()
+
+(*let build_bb vt jit bb stmts si ei =
+    if si < ei then build_stmt stmts.(si); build_bb vt jit bb stmts (si+1) ei else ()*)
