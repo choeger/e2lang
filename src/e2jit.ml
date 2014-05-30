@@ -180,7 +180,7 @@ let build_expr vt jit = function
     | BOr (a1, a2)     -> build_bool_expr build_or a1 a2 "bor_tmp" vt jit
     | BNot a -> 
             let b = build_bool_value vt jit a in
-            build_not b "bool_not" jit.builder
+            build_neg b "bool_not" jit.builder
     | BCopy a -> build_bool_value vt jit a
     | Call (name,args) -> 
             let callee =
@@ -202,25 +202,29 @@ let build_expr vt jit = function
 let build_stmt vt jit = function
     | Store (FArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
-            ignore (build_store vt.local_float_vars.(var) llvexpr jit.builder)
+            ignore (build_store llvexpr vt.local_float_vars.(var) jit.builder)
     | Store (IArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
-            ignore (build_store vt.local_int_vars.(var) llvexpr jit.builder)
+            ignore (build_store llvexpr vt.local_int_vars.(var) jit.builder)
     | Store (BArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
-            ignore (build_store vt.local_bool_vars.(var) llvexpr jit.builder)
+            ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
     | Ret (FArg var) -> ignore (build_ret vt.local_float_vars.(var) jit.builder)
     | Ret (IArg var) -> ignore (build_ret vt.local_int_vars.(var) jit.builder)
     | Ret (BArg var) -> ignore (build_ret vt.local_bool_vars.(var) jit.builder)
     | _ -> ()
 
+
 let build_stmts vt jit bb = 
+    let const = vt.local_int_vars.(0) in
+    build_add const const "constaddtmp" jit.builder;
     Array.iter ( build_stmt vt jit ) bb.stmts
 
 let build_new_block vt jit bb f =
     let new_block = append_block jit.jit_context bb.name f in
     position_at_end new_block jit.builder;
     build_stmts vt jit bb;
+    dump_value(f);
     StrMap.add bb.name new_block
 
 let build_llvm_blocks vt jit blist f =
@@ -232,5 +236,7 @@ let build_function jit blist proto name =
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
     let f = declare_function name ft jit.the_module in
     let map = build_llvm_blocks vt jit blist f in
-    ()
+    dump_value(f)
 
+let build_test name = function
+    Proc (proto, stmts) -> build_function optimizing_jit_compiler (build stmts) proto name

@@ -29,6 +29,7 @@ open E2test_methods
 open E2lang
 open E2poly
 open Kaputt.Abbreviations
+open E2jit
 
 (** Output provider for test results (to see the actual result if something went wrong *)
 let print_val = function
@@ -47,6 +48,7 @@ let poly3_id ((a1, a2, a3), FVal(b)) = (eval_poly [|a1; a2; a3|] poly3) = b
 let poly4_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly4) = b
 
 let () =
+    build_test "fac" (Proc (fac_proto, test_fac));
   Printf.printf("Running...\n") ;
   (* simple tests are provided using this syntax: *)
   Test.add_simple_test
