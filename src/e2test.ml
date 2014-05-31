@@ -80,7 +80,7 @@ let () =
     (eval_fac)       (* test-method *)
     [Spec.always => faculty_identity]  (* specification as logical implication *);
   
-  Test.add_enum_test
+ (* Test.add_enum_test
     ~title:"poly1"
     (Enum.float (-1.0) (1.0) 50)
     (eval_poly1)
@@ -102,7 +102,7 @@ let () =
     ~title:"poly4"
     (Enum.zip2 (Enum.float (-1.0) (1.0) 50) (Enum.float (-1.0) (1.0) 50))
     (fun (a, b) -> eval_poly4 a b)
-    [Spec.always => poly4_id];
+    [Spec.always => poly4_id]; *)
 
   (* finally run our tests *)
   Test.launch_tests ()

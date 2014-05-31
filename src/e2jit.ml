@@ -142,15 +142,21 @@ let llvm_rettype jit = function
 (* generation *)
 let build_int_value vt jit = function
     | IntLit n -> const_int jit.int_type n
-    | IntVar c -> vt.local_int_vars.(c)
+    | IntVar c -> 
+        let pi = vt.local_int_vars.(c) in
+        build_load pi "tempInt" jit.builder
 
 let build_float_value vt jit = function
     | FloatLit f -> const_float jit.double_type f
-    | FloatVar c -> vt.local_float_vars.(c)
+    | FloatVar c -> 
+        let pf = vt.local_float_vars.(c) in
+        build_load pf "tempFloat" jit.builder
 
 let build_bool_value vt jit = function
     | BoolLit b -> const_int jit.bool_type (if b then 1 else 0)
-    | BoolVar c -> vt.local_bool_vars.(c)
+    | BoolVar c -> 
+        let pb = vt.local_bool_vars.(c) in
+        build_load pb "tempBool" jit.builder
 
 let build_binary_expr f tf v1 v2 str vt jit =
     let tv1 = tf vt jit v1 in
@@ -216,8 +222,8 @@ let build_stmt vt jit = function
 
 
 let build_stmts vt jit bb = 
-    let const = vt.local_int_vars.(0) in
-    build_add const const "constaddtmp" jit.builder;
+  (*  let const = vt.local_int_vars.(0) in
+    build_add const const "constaddtmp" jit.builder; *)
     Array.iter ( build_stmt vt jit ) bb.stmts
 
 let build_new_block vt jit bb f =
@@ -229,6 +235,24 @@ let build_new_block vt jit bb f =
 let build_llvm_blocks vt jit blist f =
     List.fold_left (fun map bb -> build_new_block vt jit bb f map) StrMap.empty blist
 
+let build_link jit map vt bb = 
+    let llvm_block = StrMap.find bb.name map in 
+    position_at_end llvm_block jit.builder;
+    match(bb.next) with
+         NoBlock -> ()
+       | OneBlock s -> 
+            let next_block = StrMap.find s map in
+            ignore (build_br next_block jit.builder) 
+       | CondBlocks (i,s1,s2) -> 
+            let var = vt.local_bool_vars.(i) in
+            let bool_val = build_load var "tempBool" jit.builder in
+            let next_block_1 = StrMap.find s1 map in
+            let next_block_2 = StrMap.find s2 map in  
+            ignore (build_cond_br bool_val next_block_1 next_block_2 jit.builder) 
+
+let build_links jit map vt = 
+    List.iter ( build_link jit map vt )
+
 (* TODO: finish up *)
 let build_function jit blist proto name = 
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
@@ -237,6 +261,7 @@ let build_function jit blist proto name =
     let _ = position_at_end init_block jit.builder in
     let vt = build_local_vars proto jit in
     let map = build_llvm_blocks vt jit blist f in
+    build_links jit map vt blist;     
     dump_value(f)
 
 let build_test name = function
