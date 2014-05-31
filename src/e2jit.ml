@@ -224,7 +224,6 @@ let build_new_block vt jit bb f =
     let new_block = append_block jit.jit_context bb.name f in
     position_at_end new_block jit.builder;
     build_stmts vt jit bb;
-    dump_value(f);
     StrMap.add bb.name new_block
 
 let build_llvm_blocks vt jit blist f =
@@ -232,9 +231,11 @@ let build_llvm_blocks vt jit blist f =
 
 (* TODO: finish up *)
 let build_function jit blist proto name = 
-    let vt = build_local_vars proto jit in
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
     let f = declare_function name ft jit.the_module in
+    let init_block = append_block jit.jit_context "init" f in
+    let _ = position_at_end init_block jit.builder in
+    let vt = build_local_vars proto jit in
     let map = build_llvm_blocks vt jit blist f in
     dump_value(f)
 
