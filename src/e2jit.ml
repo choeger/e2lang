@@ -32,6 +32,7 @@ open Llvm
 open Llvm_executionengine
 open Llvm_target
 open Llvm_scalar_opts
+open Llvm_analysis
 
 (**
  OCaml interface to the thin C-layer for method invocation
@@ -186,7 +187,7 @@ let build_expr vt jit = function
     | BOr (a1, a2)     -> build_bool_expr build_or a1 a2 "bor_tmp" vt jit
     | BNot a -> 
             let b = build_bool_value vt jit a in
-            build_neg b "bool_not" jit.builder
+            build_not b "bool_not" jit.builder
     | BCopy a -> build_bool_value vt jit a
     | Call (name,args) -> 
             let callee =
@@ -215,9 +216,15 @@ let build_stmt vt jit = function
     | Store (BArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
-    | Ret (FArg var) -> ignore (build_ret vt.local_float_vars.(var) jit.builder)
-    | Ret (IArg var) -> ignore (build_ret vt.local_int_vars.(var) jit.builder)
-    | Ret (BArg var) -> ignore (build_ret vt.local_bool_vars.(var) jit.builder)
+    | Ret (FArg var) ->
+            let retval = build_float_value vt jit (FloatVar var) in
+            ignore (build_ret retval jit.builder)
+    | Ret (IArg var) ->
+            let retval = build_int_value vt jit (IntVar var) in
+            ignore (build_ret retval jit.builder)
+    | Ret (BArg var) ->
+            let retval = build_bool_value vt jit (BoolVar var) in
+            ignore (build_ret retval jit.builder)
     | _ -> ()
 
 
@@ -253,6 +260,14 @@ let build_link jit map vt bb =
 let build_links jit map vt = 
     List.iter ( build_link jit map vt )
 
+let build_store_param jit params vt pidx = function
+    | IArg i -> ignore (build_store params.(pidx) vt.local_int_vars.(i) jit.builder)
+    | FArg i -> ignore (build_store params.(pidx) vt.local_float_vars.(i) jit.builder)
+    | BArg i -> ignore (build_store params.(pidx) vt.local_bool_vars.(i) jit.builder)
+
+let build_store_params jit proto params vt =
+    Array.iteri (build_store_param jit params vt) proto.args
+
 (* TODO: finish up *)
 let build_function jit blist proto name = 
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
@@ -260,9 +275,18 @@ let build_function jit blist proto name =
     let init_block = append_block jit.jit_context "init" f in
     let _ = position_at_end init_block jit.builder in
     let vt = build_local_vars proto jit in
+    let _ = build_store_params jit proto (params f) vt in
     let map = build_llvm_blocks vt jit blist f in
-    build_links jit map vt blist;     
-    dump_value(f)
+    build_links jit map vt blist;
+    position_at_end init_block jit.builder;
+    build_br (StrMap.find "start" map) jit.builder;
+    Llvm_analysis.assert_valid_function f;
+    dump_value(f);
+    f
 
 let build_test name = function
-    Proc (proto, stmts) -> build_function optimizing_jit_compiler (build stmts) proto name
+    Proc (proto, stmts) ->
+        let f = build_function optimizing_jit_compiler (build stmts) proto name in
+        let m = pointer_to_method optimizing_jit_compiler.the_execution_engine f in
+        let res = eval__i_i m 6 in
+        print_string (string_of_int res ^ "\n")
