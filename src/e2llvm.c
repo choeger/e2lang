@@ -30,18 +30,23 @@ CAMLprim value eval_method_int(void *p) {
 }
 
 CAMLprim value eval_method_bool(void *p) {
-  int (*f)() = p;
+  char (*f)() = p;
   return Val_bool(f());
 }
 
 CAMLprim value eval_method_obj(void *p) {
-  value (*f)() = p;
+  int (*f)() = p;
   return f();
 }
 
 /* external eval__i_i : method_ptr -> int -> int = "eval__i_i" */
 CAMLprim value eval__i_i(void *p, value i) {
-  value (*f)(int) = p;
-  return Val_int(f(Int_val(i)));
+  long long arg = i;
+  value (*f)(long long) = p;
+  return Val_int(f(Int_val(arg)));
 }
 
+CAMLprim value eval__i_b(void *p, value i) {
+    value (*f)(int) = p;
+    return Val_bool(f(Int_val(i)));
+}

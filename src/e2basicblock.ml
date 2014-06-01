@@ -33,7 +33,7 @@ let rec build_blocks name stmts = function
                     let new_name = "postcj$" ^ name in
                     let lblname = "lbl$" ^ str in
                     let nb = build_blocks new_name stmts (ei+1, ei+1) in
-                    {name = name; stmts = Array.sub stmts si (ei - si); next = CondBlocks (cond, new_name, lblname)}::nb
+                    {name = name; stmts = Array.sub stmts si (ei - si); next = CondBlocks (cond, lblname, new_name)}::nb
             | Ret arg -> 
                     let new_name = "postret$" ^ name in
                     let nb = build_blocks new_name stmts (ei+1, ei+1) in

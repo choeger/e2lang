@@ -44,6 +44,7 @@ external pointer_to_method : ExecutionEngine.t -> Llvm.llvalue -> method_ptr = "
 external eval_method_int : method_ptr -> int = "eval_method_int"
 
 external eval__i_i : method_ptr -> int -> int = "eval__i_i"
+external eval__i_b : method_ptr -> int -> bool = "eval__i_b"
 
 external eval_method_bool : method_ptr -> bool = "eval_method_bool"
 
@@ -185,7 +186,7 @@ let build_expr vt jit = function
     | ICopy a          -> build_int_value vt jit a
     | BAnd (a1, a2)    -> build_bool_expr build_and a1 a2 "band_tmp" vt jit
     | BOr (a1, a2)     -> build_bool_expr build_or a1 a2 "bor_tmp" vt jit
-    | BNot a -> 
+    | BNot a ->
             let b = build_bool_value vt jit a in
             build_not b "bool_not" jit.builder
     | BCopy a -> build_bool_value vt jit a

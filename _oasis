@@ -15,8 +15,8 @@ Library e2lang
   Path:       src
   CompiledObject: best
   BuildTools:   ocamlbuild
-  Modules:      E2lang, E2link, E2intpr, E2pretty, E2poly, E2jit
-  BuildDepends: smart_print, llvm, llvm_analysis, llvm_executionengine, llvm_target, llvm_scalar_opts
+  Modules:      E2lang, E2link, E2intpr, E2pretty, E2poly, E2jit, E2basicblock
+  BuildDepends: smart_print, llvm, llvm.analysis, llvm.executionengine, llvm.target, llvm.scalar_opts
   CSources:     e2llvm.c
   
 Executable e2bench
