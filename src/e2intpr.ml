@@ -147,6 +147,11 @@ and eval meta state stmts i = match stmts.(i) with
 			 
   (* Exec of tnp-instructions *)
   | Store((DArg var), DAdd (x, y)) -> tnp_add meta.params meta.order state.der_vars.(var) state.der_vars.(x) state.der_vars.(y) ; eval meta state stmts (i+1)
+  | Store((DArg var), DMul (x, y)) -> tnp_mult meta.params meta.order state.der_vars.(var) state.der_vars.(x) state.der_vars.(y) ; eval meta state stmts (i+1)
+  | Store((DArg var), DPwr (n, x)) -> tnp_pow meta.params meta.order state.der_vars.(var) state.der_vars.(x) (int state n) ; eval meta state stmts (i+1)
+  | Store((DArg var), DLoadF (f)) -> tnp_constant meta.params meta.order state.der_vars.(var) (float state f) ; eval meta state stmts (i+1)
+  | Store((DArg var), DCopy (d)) -> Array.blit state.der_vars.(d) 0 state.der_vars.(var) 0 ((meta.params + 1) * (meta.order + 1)) ; eval meta state stmts (i+1)
+  
 
   (* Exec of float instructions *)
   | Store((FArg var), FAdd (x, y)) -> state.float_vars.(var) <- ((float state x) +. (float state y)) ; eval meta state stmts (i+1)
