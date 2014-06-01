@@ -142,8 +142,7 @@ let rec simplify_fix p = let s = simplify p in if s = p then p else simplify_fix
 
 
 let pow_to_e2 i n c =
-    let rec pow i n c =
-        if n = 0
+    let rec pow i n c = if n = 0
         then [| |]
         else Array.append [| Store (DArg c, DMul (i, c)) |] (pow i (n-1) c)
     in
@@ -152,7 +151,7 @@ let pow_to_e2 i n c =
 let rec poly_to_e2_stmts c = function
     | Number f -> ([| Store (DArg c, DLoadF (FloatLit f)) |], c+1)
     | Variable (i, n, p, qs) ->
-            let powArr = pow_to_e2 i n c in
+            let powArr = [| Store(DArg c, DPwr (IntLit n, i)) |] (*pow_to_e2 i n c*) in
             match poly_to_e2_stmts (c+1) p with
             | (pArr, c') ->
                     let multArr = [| Store (DArg c', DMul (c,(c'-1))) |] in
@@ -183,6 +182,6 @@ let poly_to_e2 p n =
     match poly_to_e2_stmts n p with
     | (stmts, cnt) ->
             let argArr = Array.of_list (argList 0 (n-1)) in
-            let proto = { ivars = 0; bvars = 0; dvars = 0; fvars = cnt; args = argArr; ret=DRet } in
+            let proto = { ivars = 0; bvars = 0; dvars = cnt; fvars = 0; args = argArr; ret=DRet } in
             let ret = [| Ret (DArg (cnt-1)) |] in
             Proc (proto, Array.append stmts ret)

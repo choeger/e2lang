@@ -95,11 +95,11 @@ let proc state f = StrMap.find f state.procedures
 let location state s = StrMap.find s state.locations  
 
 (** automatic differentiation *)
-external tnp_add : int -> int -> der_val -> der_val -> der_val -> unit = "op_tnp_number_add"
-external tnp_mult : int -> int -> der_val -> der_val -> der_val -> unit = "op_tnp_number_mult"
-external tnp_pow : int -> int -> der_val -> der_val -> int -> unit = "op_tnp_number_pow"
-external tnp_constant : int -> int -> der_val -> float -> unit = "op_tnp_number_write_constant"
-external tnp_variable : int -> int -> der_val -> float -> int -> unit = "op_tnp_number_write_variable"
+external tnp_add : int -> int -> der_val -> der_val -> der_val -> unit = "d_add" (*"op_tnp_number_add"*)
+external tnp_mult : int -> int -> der_val -> der_val -> der_val -> unit = "d_mul" (*"op_tnp_number_mult"*)
+external tnp_pow : int -> int -> der_val -> der_val -> int -> unit = "d_pow" (*"op_tnp_number_pow"*)
+external tnp_constant : int -> int -> der_val -> float -> unit = "d_const" (*"op_tnp_number_write_constant"*)
+external tnp_variable : int -> int -> der_val -> float -> int -> unit = "d_var" (*"op_tnp_number_write_variable"*)
 
 let rec eval_method meta proc args =   
   let proto = proc.p_prototype in
@@ -125,6 +125,11 @@ let rec eval_method meta proc args =
   (* start instruction evaluation *)
   eval meta state proc.p_statements 0
 
+and test_tnp_constant () =
+    let arr = Array.init 10 (fun _ -> 1.0) in
+    print_string (string_of_float (arr.(0)));
+    tnp_constant 0 0 arr 2.0;
+    print_string (string_of_float (arr.(0)))
 
 and eval meta state stmts i = match stmts.(i) with
     (* Debug *)

@@ -19,6 +19,42 @@
 
 #include <stdio.h>
 
+void op_tnp_number_add(int, int, double*, double*, double*);
+void op_tnp_number_mult(int, int, double*, double*, double*);
+void op_tnp_number_pow(int, int, double*, double*, int);
+void op_tnp_number_write_constant(int, int, double*, double);
+void op_tnp_number_write_variable(int, int, double*, double, int);
+
+CAMLprim value ints(int i1, int i2) {
+    printf("i1: %d\ti2: %d\n", Int_val(i1), Int_val(i2));
+    return 0;
+}
+
+CAMLprim value d_const(int params, int order, double* arr, value c) {
+    op_tnp_number_write_constant(Int_val(params), Int_val(order), arr, Double_val(c));
+    return 0;
+}
+
+CAMLprim value d_add(int p, int o, double* dst, double* src1, double* src2) {
+    op_tnp_number_add(Int_val(p), Int_val(o), dst, src1, src2);
+    return 0;
+}
+
+CAMLprim value d_mul(int p, int o, double* dst, double* src1, double* src2) {
+    op_tnp_number_mult(Int_val(p), Int_val(o), dst, src1, src2);
+    return 0;
+}
+
+CAMLprim value d_pow(int p, int o, double* dst, double* src, int n) {
+    op_tnp_number_pow(Int_val(p), Int_val(o), dst, src, Int_val(n));
+    return 0;
+}
+
+CAMLprim value d_var(int p, int o, double* dst, value val, int n) {
+    op_tnp_number_write_variable(Int_val(p), Int_val(o), dst, Double_val(val), Int_val(n));
+    return 0;
+}
+
 CAMLprim value eval_method_float(void *p) {
   double (*f)() = p;
   return caml_copy_double(f());
