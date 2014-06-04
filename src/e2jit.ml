@@ -60,6 +60,7 @@ type jit_compiler = {
   double_type : lltype ;
   int_type : lltype ;
   bool_type : lltype ;
+  dvar_type : lltype ;
 
   the_module : llmodule ;
 
@@ -78,6 +79,7 @@ let optimizing_jit_compiler =
   let double_type = double_type jit_context in
   let int_type = i64_type jit_context in
   let bool_type = i1_type jit_context in
+  let dvar_type = pointer_type double_type in
 
   let the_module = create_module jit_context "e2lang procedures" in
 
@@ -108,7 +110,7 @@ let optimizing_jit_compiler =
     ignore (PassManager.initialize fpm);
     fpm ) in
   { jit_context ; builder ; double_type ; int_type ; 
-    bool_type ; the_module ; the_execution_engine ;
+    bool_type ; dvar_type ; the_module ; the_execution_engine ;
     the_fpm ;
   }
       
@@ -138,6 +140,7 @@ let llvm_type jit = function
     IArg _ -> jit.int_type
   | FArg _ -> jit.double_type
   | BArg _ -> jit.bool_type
+  | DArg _ -> jit.dvar_type
 
 let llvm_rettype jit = function
     IRet -> jit.int_type
@@ -176,7 +179,7 @@ let build_float_expr f =
 let build_bool_expr f =
     build_binary_expr f build_bool_value
 
-let build_expr vt jit = function
+let build_expr vt globals jit = function
     | FAdd (a1, a2)     -> build_float_expr build_fadd a1 a2 "fadd_tmp" vt jit
     | FMul (a1, a2)     -> build_float_expr build_fmul a1 a2 "fmul_tmp" vt jit
     | FCopyI a -> 
@@ -212,7 +215,7 @@ let build_expr vt jit = function
             let arg = Array.map map_args args in (* new array with llvm values *)
             build_call callee arg "call_function" jit.builder 
 
-let build_stmt vt jit = function
+let build_stmt vt globals jit = function
     | Store (FArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_float_vars.(var) jit.builder)
@@ -222,6 +225,26 @@ let build_stmt vt jit = function
     | Store (BArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
+    | Store (DArg var, expr) ->
+            let llvexpr = build_expr vt jit expr in
+            (* store llvexpr to var *)()
+    | Store (DArg var, DMul (v1, v2)) ->
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|]
+            build_call globals.tnp_mul args "call_mul" jit.builder
+    | Store (DArg var, DAdd (v1, v2)) ->
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|]
+            build_call globals.tnp_add args "call_add" jit.builder
+    | Store (DArg var, DPwr (i, v)) ->
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); build_int_value i|]
+            build_call globals.tnp_pow args "call_pow" jit.builder
+    | Store (DArg var, DLoadF f) ->
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value f|]
+            build_call globals.tnp_const args "call_const" jit.builder
+    | Store (DArg var, DCopy v) ->
+            let cargs = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value (FloatLit 0.)|]
+            build_call globals.tnp_const args "call_const" jit.builder
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v); vt.local_dvar_vars(var)|]
+            build_call globals.tnp_add args "call_add" jit.builder
     | Ret (FArg var) ->
             let retval = build_float_value vt jit (FloatVar var) in
             ignore (build_ret retval jit.builder)
@@ -231,6 +254,9 @@ let build_stmt vt jit = function
     | Ret (BArg var) ->
             let retval = build_bool_value vt jit (BoolVar var) in
             ignore (build_ret retval jit.builder)
+    | Ret (DArg var) ->
+            (* store var to output argument *)
+            ignore (build_ret_void jit.builder)
     | _ -> ()
 
 
@@ -239,14 +265,14 @@ let build_stmts vt jit bb =
     build_add const const "constaddtmp" jit.builder; *)
     Array.iter ( build_stmt vt jit ) bb.stmts
 
-let build_new_block vt jit bb f =
+let build_new_block vt globals jit bb f =
     let new_block = append_block jit.jit_context bb.name f in
     position_at_end new_block jit.builder;
-    build_stmts vt jit bb;
+    build_stmts vt globals jit bb;
     StrMap.add bb.name new_block
 
-let build_llvm_blocks vt jit blist f =
-    List.fold_left (fun map bb -> build_new_block vt jit bb f map) StrMap.empty blist
+let build_llvm_blocks vt globals jit blist f =
+    List.fold_left (fun map bb -> build_new_block vt globals jit bb f map) StrMap.empty blist
 
 let build_link jit map vt bb = 
     let llvm_block = StrMap.find bb.name map in 
@@ -279,17 +305,28 @@ type globals = {
     params : llvalue;
     order : llvalue;
     size : llvalue;
+    tnp_mul : llvalue;
+    tnp_add : llvalue;
+    tnp_pow : llvalue;
+    tnp_const : llvalue;
+    tnp_var : llvalue;
 }
 
 (* TODO: finish up *)
 let build_function jit blist proto name globals = 
-    let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
+    let llargs = (Array.map (llvm_type jit) proto.args) in
+    let ft = function_type (llvm_rettype jit proto.ret) llargs in
     let f = declare_function name ft jit.the_module in
     let init_block = append_block jit.jit_context "init" f in
     let _ = position_at_end init_block jit.builder in
+    
+    let par = build_load globals.params "params" jit.builder in
+    let ord = build_load globals.params "order" jit.builder in
+    let newglobals = {params=par; order=ord; size=globals.size;tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var} in
+
     let vt = build_local_vars proto jit globals.size in
     let _ = build_store_params jit proto (params f) vt in
-    let map = build_llvm_blocks vt jit blist f in
+    let map = build_llvm_blocks vt newglobals jit blist f in
     build_links jit map vt blist;
     position_at_end init_block jit.builder;
     build_br (StrMap.find "start" map) jit.builder;
@@ -297,21 +334,12 @@ let build_function jit blist proto name globals =
     dump_value(f);
     f
 
-(*let build_test name = function
-    Proc (proto, stmts) ->
-        let f = build_function optimizing_jit_compiler (build stmts) proto name in
-        let m = pointer_to_method optimizing_jit_compiler.the_execution_engine f in
-        let res = eval__i_i m 6 in
-        print_string (string_of_int res ^ "\n")*)
-
-(*    let build_funct name Proc(proto, stmts) = build_function jit (build stmts) proto name p o in
-    StrMap.iter build_funct functions*)
-
 (* define global variables size,params and order *)
-let build_preamble jit = 
+let build_module_preamble jit = 
     let param = define_global "params" (const_int jit.int_type 0) jit.the_module in
     let order = define_global "order" (const_int jit.int_type 0) jit.the_module in
     let size = define_global "size" (const_int jit.int_type 1) jit.the_module in
+    (* define set_meta *)
     let ft = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type|] in
     let set_meta = declare_function "set_meta" ft jit.the_module in
     let init_block = append_block jit.jit_context "init" set_meta in
@@ -322,8 +350,20 @@ let build_preamble jit =
     let o1 = build_add (params set_meta).(1) (const_int jit.int_type 1) "rows" jit.builder in
     let temps = build_mul p1 o1 "size" jit.builder in
     build_store temps size jit.builder;
-    {params=param;order;size}
+    build_ret_void jit.builder;
+    Llvm_analysis.assert_valid_function set_meta;
+    (* declare globals *)
+    let binopt = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type; jit.dvar_type; jit.dvar_type; jit.dvar_type|] in
+    let addf = declare_function "op_tnp_number_add" binopt jit.the_module in
+    let mulf = declare_function "op_tnp_number_mult" binopt jit.the_module in
+    let powt = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type; jit.dvar_type; jit.dvar_type; jit.int_type |] in
+    let powf = declare_function "op_tnp_number_pow" powt jit.the_module in
+    let constt = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type; jit.dvar_type; jit.double_type|] in
+    let constf = declare_function "op_tnp_number_write_constant" constt jit.the_module in
+    let vart = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type; jit.dvar_type; jit.double_type; jit.int_type |] in
+    let varf = declare_function "op_tnp_number_write_variable" vart jit.the_module in
+    {params=param;order;size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf}
 
 let build_module functions = 
-    build_preamble optimizing_jit_compiler;
+    build_module_preamble optimizing_jit_compiler;
     dump_module optimizing_jit_compiler.the_module
