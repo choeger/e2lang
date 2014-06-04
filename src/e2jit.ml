@@ -217,33 +217,30 @@ let build_expr vt globals jit = function
 
 let build_stmt vt globals jit = function
     | Store (FArg var, expr) ->
-            let llvexpr = build_expr vt jit expr in
+            let llvexpr = build_expr vt globals jit expr in
             ignore (build_store llvexpr vt.local_float_vars.(var) jit.builder)
     | Store (IArg var, expr) ->
-            let llvexpr = build_expr vt jit expr in
+            let llvexpr = build_expr vt globals jit expr in
             ignore (build_store llvexpr vt.local_int_vars.(var) jit.builder)
     | Store (BArg var, expr) ->
-            let llvexpr = build_expr vt jit expr in
+            let llvexpr = build_expr vt globals jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
-    | Store (DArg var, expr) ->
-            let llvexpr = build_expr vt jit expr in
-            (* store llvexpr to var *)()
     | Store (DArg var, DMul (v1, v2)) ->
-            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|]
+            let args:llvalue array = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|] in
             build_call globals.tnp_mul args "call_mul" jit.builder
     | Store (DArg var, DAdd (v1, v2)) ->
-            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|]
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars(v2)|] in
             build_call globals.tnp_add args "call_add" jit.builder
     | Store (DArg var, DPwr (i, v)) ->
-            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); build_int_value i|]
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); build_int_value i|] in
             build_call globals.tnp_pow args "call_pow" jit.builder
     | Store (DArg var, DLoadF f) ->
-            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value f|]
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value f|] in
             build_call globals.tnp_const args "call_const" jit.builder
     | Store (DArg var, DCopy v) ->
-            let cargs = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value (FloatLit 0.)|]
-            build_call globals.tnp_const args "call_const" jit.builder
-            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v); vt.local_dvar_vars(var)|]
+            let cargs = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value (FloatLit 0.)|] in
+            build_call globals.tnp_const args "call_const" jit.builder;
+            let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v); vt.local_dvar_vars(var)|] in
             build_call globals.tnp_add args "call_add" jit.builder
     | Ret (FArg var) ->
             let retval = build_float_value vt jit (FloatVar var) in
