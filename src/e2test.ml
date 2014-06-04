@@ -51,9 +51,10 @@ let poly3_id ((a1, a2, a3), FVal(b)) = (eval_poly [|a1; a2; a3|] poly3) = b
 let poly4_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly4) = b
 
 let () =
-    twoInts 1 2;
+  (*  twoInts 1 2;
     test_tnp_constant () ;
-    build_test "fac" (Proc (fac_proto, test_fac));
+    build_test "fac" (Proc (fac_proto, test_fac));*)
+    build_module [||];
   Printf.printf("Running...\n") ;
   (* simple tests are provided using this syntax: *)
   Test.add_simple_test

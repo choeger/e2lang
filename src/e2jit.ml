@@ -120,16 +120,19 @@ type var_table = {
   local_int_vars : llvalue array ;
   local_float_vars : llvalue array ;
   local_bool_vars : llvalue array ;
+  local_dvar_vars : llvalue array;
 }
 
-let build_local_vars proto jit = 
+let build_local_vars proto jit size = 
   let make_ivar i = build_alloca jit.int_type (Printf.sprintf "int%d" i) jit.builder in
   let make_fvar i = build_alloca jit.double_type (Printf.sprintf "flt%d" i) jit.builder in
   let make_bvar i = build_alloca jit.bool_type (Printf.sprintf "bool%d" i) jit.builder in
+  let make_dvar i = build_array_alloca jit.double_type size (Printf.sprintf "fltArray%d" i) jit.builder in
 
    { local_int_vars = Array.init proto.ivars make_ivar ; 
      local_bool_vars = Array.init proto.bvars make_bvar; 
-     local_float_vars = Array.init proto.fvars make_fvar }
+     local_float_vars = Array.init proto.fvars make_fvar;
+     local_dvar_vars = Array.init proto.dvars make_dvar }
 
 let llvm_type jit = function
     IArg _ -> jit.int_type
@@ -140,6 +143,7 @@ let llvm_rettype jit = function
     IRet -> jit.int_type
   | FRet -> jit.double_type
   | BRet -> jit.bool_type
+  | DRet -> void_type jit.jit_context 
 
 (* generation *)
 let build_int_value vt jit = function
@@ -203,6 +207,7 @@ let build_expr vt jit = function
                 | IArg a -> vt.local_int_vars.(a)
                 | FArg a -> vt.local_float_vars.(a)
                 | BArg a -> vt.local_bool_vars.(a)  
+                | DArg a -> vt.local_dvar_vars.(a)
             in
             let arg = Array.map map_args args in (* new array with llvm values *)
             build_call callee arg "call_function" jit.builder 
@@ -265,17 +270,24 @@ let build_store_param jit params vt pidx = function
     | IArg i -> ignore (build_store params.(pidx) vt.local_int_vars.(i) jit.builder)
     | FArg i -> ignore (build_store params.(pidx) vt.local_float_vars.(i) jit.builder)
     | BArg i -> ignore (build_store params.(pidx) vt.local_bool_vars.(i) jit.builder)
+    | DArg i -> ignore (build_store params.(pidx) vt.local_dvar_vars.(i) jit.builder)
 
 let build_store_params jit proto params vt =
     Array.iteri (build_store_param jit params vt) proto.args
 
+type globals = {
+    params : llvalue;
+    order : llvalue;
+    size : llvalue;
+}
+
 (* TODO: finish up *)
-let build_function jit blist proto name = 
+let build_function jit blist proto name globals = 
     let ft = function_type (llvm_rettype jit proto.ret) (Array.map (llvm_type jit) proto.args) in
     let f = declare_function name ft jit.the_module in
     let init_block = append_block jit.jit_context "init" f in
     let _ = position_at_end init_block jit.builder in
-    let vt = build_local_vars proto jit in
+    let vt = build_local_vars proto jit globals.size in
     let _ = build_store_params jit proto (params f) vt in
     let map = build_llvm_blocks vt jit blist f in
     build_links jit map vt blist;
@@ -285,9 +297,33 @@ let build_function jit blist proto name =
     dump_value(f);
     f
 
-let build_test name = function
+(*let build_test name = function
     Proc (proto, stmts) ->
         let f = build_function optimizing_jit_compiler (build stmts) proto name in
         let m = pointer_to_method optimizing_jit_compiler.the_execution_engine f in
         let res = eval__i_i m 6 in
-        print_string (string_of_int res ^ "\n")
+        print_string (string_of_int res ^ "\n")*)
+
+(*    let build_funct name Proc(proto, stmts) = build_function jit (build stmts) proto name p o in
+    StrMap.iter build_funct functions*)
+
+(* define global variables size,params and order *)
+let build_preamble jit = 
+    let param = define_global "params" (const_int jit.int_type 0) jit.the_module in
+    let order = define_global "order" (const_int jit.int_type 0) jit.the_module in
+    let size = define_global "size" (const_int jit.int_type 1) jit.the_module in
+    let ft = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type|] in
+    let set_meta = declare_function "set_meta" ft jit.the_module in
+    let init_block = append_block jit.jit_context "init" set_meta in
+    position_at_end init_block jit.builder;
+    build_store (params set_meta).(0) param jit.builder;
+    build_store (params set_meta).(1) order jit.builder;
+    let p1 = build_add (params set_meta).(0) (const_int jit.int_type 1) "columns" jit.builder in
+    let o1 = build_add (params set_meta).(1) (const_int jit.int_type 1) "rows" jit.builder in
+    let temps = build_mul p1 o1 "size" jit.builder in
+    build_store temps size jit.builder;
+    {params=param;order;size}
+
+let build_module functions = 
+    build_preamble optimizing_jit_compiler;
+    dump_module optimizing_jit_compiler.the_module
