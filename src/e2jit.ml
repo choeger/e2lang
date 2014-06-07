@@ -43,6 +43,9 @@ external pointer_to_method : ExecutionEngine.t -> Llvm.llvalue -> method_ptr = "
 
 external eval_method_int : method_ptr -> int = "eval_method_int"
 
+external eval_dd : method_ptr -> der_val -> der_val -> unit = "eval_method_dd"
+external eval_ii : method_ptr -> int -> int -> unit = "eval_method_ii"
+
 external eval__i_i : method_ptr -> int -> int = "eval__i_i"
 external eval__i_b : method_ptr -> int -> bool = "eval__i_b"
 
@@ -77,7 +80,7 @@ let optimizing_jit_compiler =
 
   let builder = builder jit_context in
   let double_type = double_type jit_context in
-  let int_type = i64_type jit_context in
+  let int_type = i32_type jit_context in
   let bool_type = i1_type jit_context in
   let dvar_type = pointer_type double_type in
 
@@ -126,10 +129,11 @@ type var_table = {
 }
 
 let build_local_vars proto jit size = 
+  let localsize = build_load size "size" jit.builder in
   let make_ivar i = build_alloca jit.int_type (Printf.sprintf "int%d" i) jit.builder in
   let make_fvar i = build_alloca jit.double_type (Printf.sprintf "flt%d" i) jit.builder in
   let make_bvar i = build_alloca jit.bool_type (Printf.sprintf "bool%d" i) jit.builder in
-  let make_dvar i = build_array_alloca jit.double_type size (Printf.sprintf "fltArray%d" i) jit.builder in
+  let make_dvar i = build_array_alloca jit.double_type localsize (Printf.sprintf "fltArray%d" i) jit.builder in
 
    { local_int_vars = Array.init proto.ivars make_ivar ; 
      local_bool_vars = Array.init proto.bvars make_bvar; 
@@ -228,9 +232,9 @@ type globals = {
 
 let build_copy_array src tgt globals jit =
     let cargs = [|globals.params; globals.order; tgt; const_float jit.double_type 0.|] in
-    build_call globals.tnp_const cargs "call_const" jit.builder;
+    build_call globals.tnp_const cargs "" jit.builder;
     let args = [|globals.params; globals.order; tgt; src; tgt|] in
-    ignore (build_call globals.tnp_add args "call_add" jit.builder)
+    ignore (build_call globals.tnp_add args "" jit.builder)
 
 let build_stmt vt globals f jit = function
     | Store (FArg var, expr) ->
@@ -244,16 +248,16 @@ let build_stmt vt globals f jit = function
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
     | Store (DArg var, DMul (v1, v2)) ->
             let args:llvalue array = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
-            ignore (build_call globals.tnp_mul args "call_mul" jit.builder)
+            ignore (build_call globals.tnp_mul args "" jit.builder)
     | Store (DArg var, DAdd (v1, v2)) ->
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
-            ignore (build_call globals.tnp_add args "call_add" jit.builder)
+            ignore (build_call globals.tnp_add args "" jit.builder)
     | Store (DArg var, DPwr (i, v)) ->
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v); build_int_value vt jit i|] in
-            ignore (build_call globals.tnp_pow args "call_pow" jit.builder)
+            ignore (build_call globals.tnp_pow args "" jit.builder)
     | Store (DArg var, DLoadF f) ->
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value vt jit f|] in
-            ignore (build_call globals.tnp_const args "call_const" jit.builder)
+            ignore (build_call globals.tnp_const args "" jit.builder)
     | Store (DArg var, DCopy v) ->
             build_copy_array vt.local_dvar_vars.(v) vt.local_dvar_vars.(var) globals jit
     | Ret (FArg var) ->
@@ -325,13 +329,14 @@ let build_function jit blist proto name globals =
     let newglobals = {params=par; order=ord; size=globals.size;tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var} in
 
     let vt = build_local_vars proto jit globals.size in
-    let _ = build_store_params jit proto (params f) vt globals in
+    let _ = build_store_params jit proto (params f) vt newglobals in
     let map = build_llvm_blocks vt newglobals jit blist f in
     build_links jit map vt blist;
     position_at_end init_block jit.builder;
     build_br (StrMap.find "start" map) jit.builder;
     Llvm_analysis.assert_valid_function f;
-    dump_value(f);
+    (*dump_value(f)*);
+    PassManager.run_function f jit.the_fpm;
     f
 
 (* define global variables size,params and order *)
@@ -370,4 +375,8 @@ let build_module (Proc (proto, stmts)) =
     let f = build_function optimizing_jit_compiler (build stmts) proto "test" globals in
     let m = pointer_to_method jit.the_execution_engine f in
     dump_module optimizing_jit_compiler.the_module;
-    print_string (string_of_int (eval__i_i m 6) ^ "\n")
+    let Some(set_meta) = lookup_function "set_meta" jit.the_module in
+    eval_ii (pointer_to_method jit.the_execution_engine set_meta) 1 0;
+    let ret = [|0.; 0.|] in
+    eval_dd m [|2.; 3.5|] ret;
+    Printf.printf "(%f, %f)\n%!" ret.(0) ret.(1)

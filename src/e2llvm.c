@@ -31,30 +31,51 @@ CAMLprim value ints(int i1, int i2) {
 }
 
 CAMLprim value d_const(value params, value order, double* arr, value c) {
+    CAMLparam4(params, order, arr, c);
     op_tnp_number_write_constant(Int_val(params), Int_val(order), arr, Double_val(c));
-    return 0;
+    CAMLreturn0;
 }
 
 CAMLprim value d_add(value p, value o, double* dst, double* src1, double* src2) {
+    CAMLparam5(p, o, dst, src1, src2);
+    //printf("> (%f, %f) + (%f, %f)", src1[0], src1[1], src2[0], src2[1]);
     op_tnp_number_add(Int_val(p), Int_val(o), dst, src1, src2);
-    return 0;
+    //printf("= (%f, %f)\n", dst[0], dst[1]);
+    CAMLreturn0;
 }
 
 CAMLprim value d_mul(value p, value o, double* dst, double* src1, double* src2) {
-    printf("src1[0]=%f src1[1]=%f\nsrc2[0]=%f src2[1]=%f\n", src1[0], src1[1], src2[0], src2[1]);
+    CAMLparam5(p, o, dst, src1, src2);
+    //printf("> (%f, %f) * (%f, %f)", src1[0], src1[1], src2[0], src2[1]);
     op_tnp_number_mult(Int_val(p), Int_val(o), dst, src1, src2);
-    printf("dst[0]=%f dst[1]=%f\n", dst[0], dst[1]);
-    return 0;
+    //printf("= (%f, %f)\n", dst[0], dst[1]);
+    CAMLreturn0;
 }
 
 CAMLprim value d_pow(value p, value o, double* dst, double* src, int n) {
+    CAMLparam5(p, o, dst, src, n);
     op_tnp_number_pow(Int_val(p), Int_val(o), dst, src, Int_val(n));
-    return 0;
+    CAMLreturn0;
 }
 
 CAMLprim value d_var(value p, value o, double* dst, value val, int n) {
+    CAMLparam5(p, o, dst, val, n);
     op_tnp_number_write_variable(Int_val(p), Int_val(o), dst, Double_val(val), Int_val(n));
-    return 0;
+    CAMLreturn0;
+}
+
+CAMLprim value eval_method_dd(void *p, double* arg, double* ret) {
+    CAMLparam3(p, arg, ret);
+    void (*f)(double*, double*) = p;
+    f(arg, ret);
+    CAMLreturn0;
+}
+
+CAMLprim value eval_method_ii(void *p, value i1, value i2) {
+    CAMLparam3(p, i1, i2);
+    void (*f)(int, int) = p;
+    f(Int_val(i1), Int_val(i2));
+    CAMLreturn0;
 }
 
 CAMLprim value eval_method_float(void *p) {
