@@ -30,27 +30,29 @@ CAMLprim value ints(int i1, int i2) {
     return 0;
 }
 
-CAMLprim value d_const(int params, int order, double* arr, value c) {
+CAMLprim value d_const(value params, value order, double* arr, value c) {
     op_tnp_number_write_constant(Int_val(params), Int_val(order), arr, Double_val(c));
     return 0;
 }
 
-CAMLprim value d_add(int p, int o, double* dst, double* src1, double* src2) {
+CAMLprim value d_add(value p, value o, double* dst, double* src1, double* src2) {
     op_tnp_number_add(Int_val(p), Int_val(o), dst, src1, src2);
     return 0;
 }
 
-CAMLprim value d_mul(int p, int o, double* dst, double* src1, double* src2) {
+CAMLprim value d_mul(value p, value o, double* dst, double* src1, double* src2) {
+    printf("src1[0]=%f src1[1]=%f\nsrc2[0]=%f src2[1]=%f\n", src1[0], src1[1], src2[0], src2[1]);
     op_tnp_number_mult(Int_val(p), Int_val(o), dst, src1, src2);
+    printf("dst[0]=%f dst[1]=%f\n", dst[0], dst[1]);
     return 0;
 }
 
-CAMLprim value d_pow(int p, int o, double* dst, double* src, int n) {
+CAMLprim value d_pow(value p, value o, double* dst, double* src, int n) {
     op_tnp_number_pow(Int_val(p), Int_val(o), dst, src, Int_val(n));
     return 0;
 }
 
-CAMLprim value d_var(int p, int o, double* dst, value val, int n) {
+CAMLprim value d_var(value p, value o, double* dst, value val, int n) {
     op_tnp_number_write_variable(Int_val(p), Int_val(o), dst, Double_val(val), Int_val(n));
     return 0;
 }

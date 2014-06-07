@@ -151,7 +151,7 @@ let pow_to_e2 i n c =
 let rec poly_to_e2_stmts c = function
     | Number f -> ([| Store (DArg c, DLoadF (FloatLit f)) |], c+1)
     | Variable (i, n, p, qs) ->
-            let powArr = [| Store(DArg c, DPwr (IntLit n, i)) |] (*pow_to_e2 i n c*) in
+            let powArr = (*[| Store(DArg c, DPwr (IntLit n, i)) |] *) pow_to_e2 i n c in
             match poly_to_e2_stmts (c+1) p with
             | (pArr, c') ->
                     let multArr = [| Store (DArg c', DMul (c,(c'-1))) |] in
