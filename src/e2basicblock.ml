@@ -7,8 +7,6 @@ type next_block =
 
 type bblock = {
     name : string;
-    (*start_pos : int;
-    end_pos : int;*)
     stmts : stmt array;
     next : next_block;
 }
