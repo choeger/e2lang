@@ -1,4 +1,6 @@
 open E2basicblock
+open Batteries
+open E2lang
 
 type next_lblock = 
     | NoLBlock
@@ -13,19 +15,9 @@ and lblock = {
     next : next_lblock Lazy.t;
 } 
 
-let block_live blist =
-    let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
-    let next map bbn = match bbn with
-        | NoBlock -> NoLBlock
-        | OneBlock bb -> OneLBlock (StrMap.lookup bb map)
-        | TwoBlocks (_,b1,b2) -> TwoLBlocks (StrMap.lookup b1 map,StrMap.lookup b2 map) in
-    let rec map = StrMap.map (fun name bb -> stmts_live bb.stmts (lazy (next map bb.next))) bbmap in
-    List.map (fun bb -> StrMap.lookup bb.name map) blist
-
-
 let stmts_live stmts next =
-    let gen_sets = Array.init (Array.length stmts) BitSet.empty in
-    let kill_sets = Array.init (Array.length stmts) BitSet.empty in
+    let gen_sets = Array.make (Array.length stmts) (BitSet.empty ()) in
+    let kill_sets = Array.make (Array.length stmts) (BitSet.empty ()) in
     let parse_stmts i = function
         | Store (DArg d, DMul (d1,d2)) -> BitSet.set gen_sets.(i) d1;
                                           BitSet.set gen_sets.(i) d2;
@@ -47,10 +39,19 @@ let stmts_live stmts next =
         | _ -> ()
     in
         Array.iteri parse_stmts stmts;
-        {in_sets = Array.init (Array.length stmts) BitSet.empty; 
-         out_sets = Array.init (Array.length stmts) BitSet.empty;
+        {in_sets = Array.make (Array.length stmts) (BitSet.empty ()); 
+         out_sets = Array.make (Array.length stmts) (BitSet.empty ());
          gen_sets = gen_sets; kill_sets = kill_sets;
          next = next}
 
- 
-    
+let block_live blist =
+    let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
+    let next map bbn = match bbn with
+        | NoBlock -> NoLBlock
+        | OneBlock bb -> OneLBlock (StrMap.find bb map)
+        | CondBlocks (_,b1,b2) -> TwoLBlocks (StrMap.find b1 map,StrMap.find b2 map) in
+    let rec map = lazy (StrMap.mapi (fun name bb -> stmts_live bb.stmts (lazy (nextc bb))) bbmap)
+    and nextc bb = next (Lazy.force map) bb.next in
+    List.map (fun bb -> StrMap.find bb.name (Lazy.force map)) blist
+
+let iterate lblocks = ()

@@ -1,14 +1,17 @@
 #require "smart_print" ;;
+#require "batteries" ;;
 #directory "_build/src" ;;
 #load "e2lang.cmo" ;;
 #load "e2poly.cmo" ;;
 #load "e2pretty.cmo" ;;
 #load "e2basicblock.cmo" ;;
+#load "e2liveness.cmo" ;;
 
 open E2lang ;;
 open E2pretty ;;
 open E2poly ;;
 open E2basicblock ;;
+open E2liveness ;;
 
 let p = Variable(0, 2, Variable(1, 2, Number(1.0), []), []) ;;
 
