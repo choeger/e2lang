@@ -54,4 +54,8 @@ let block_live blist =
     and nextc bb = next (Lazy.force map) bb.next in
     List.map (fun bb -> StrMap.find bb.name (Lazy.force map)) blist
 
-let iterate lblocks = ()
+let iterate lb i =
+    lb.in_sets.(i) <- BitSet.union lb.gen_sets.(i) ( BitSet.diff lb.out_sets(i) lb.kill_sets.(i)) ;
+    lb.out_sets.(i) <- if i = ((Array.length lb.in_sets) -1) then succ_in lb else lb.in_sets.(i+1)
+     
+     
