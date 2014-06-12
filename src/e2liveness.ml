@@ -12,6 +12,7 @@ and lblock = {
     out_sets : BitSet.t array;
     gen_sets : BitSet.t array;
     kill_sets : BitSet.t array;
+    id_sets : BitSet.t array;
     return_set : BitSet.t;
     next : next_lblock Lazy.t;
 } 
@@ -19,6 +20,7 @@ and lblock = {
 let stmts_live stmts next =
     let gen_sets = Array.make (Array.length stmts) (BitSet.empty ()) in
     let kill_sets = Array.make (Array.length stmts) (BitSet.empty ()) in
+    let id_sets = Array.make (Array.length stmts) (BitSet.empty ()) in
     let return_set = BitSet.empty () in
     let parse_stmts i = function
         | Store (DArg d, DMul (d1,d2)) -> BitSet.set gen_sets.(i) d1;
@@ -31,7 +33,8 @@ let stmts_live stmts next =
                                           BitSet.set kill_sets.(i) d
         | Store (DArg d, DLoadF _)     -> BitSet.set kill_sets.(i) d
         | Store (DArg d, DCopy d1)     -> BitSet.set gen_sets.(i) d1;
-                                          BitSet.set kill_sets.(i) d
+                                          BitSet.set kill_sets.(i) d;
+                                          BitSet.set id_sets.(i) d1
         | Store (DArg d, Call (s, args)) ->
                 Array.iter (function 
                     | DArg d -> BitSet.set gen_sets.(i) d
@@ -44,8 +47,8 @@ let stmts_live stmts next =
         Array.iteri parse_stmts stmts;
         {in_sets = Array.make (Array.length stmts) (BitSet.empty ()); 
          out_sets = Array.make (Array.length stmts) (BitSet.empty ());
-         gen_sets = gen_sets; kill_sets = kill_sets; return_set = return_set;
-         next = next}
+         gen_sets = gen_sets; kill_sets = kill_sets; id_sets = id_sets;
+         return_set = return_set; next = next}
 
 let block_live blist =
     let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
@@ -92,4 +95,5 @@ let iterate_blocks lbs =
 
 let rec iterate_fp lbs =
     if iterate_blocks lbs then iterate_fp lbs else () 
-     
+
+ 
