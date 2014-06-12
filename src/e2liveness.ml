@@ -96,4 +96,24 @@ let iterate_blocks lbs =
 let rec iterate_fp lbs =
     if iterate_blocks lbs then iterate_fp lbs else () 
 
- 
+open Graph
+
+module G = Imperative.Graph.Abstract(struct type t = int end)
+
+let build_nodes g n = 
+    let new_node i = let v = G.V.create i in G.add_vertex g v; v in
+    Array.init n new_node
+
+let build_edges g nodes lb i = 
+    let out_set = BitSet.diff lb.out_sets.(i) lb.id_sets.(i) in
+    let edge_to = BitSet.enum out_set in
+    let make_edge ki oi =
+        if ki <> oi then G.add_edge g nodes.(ki) nodes.(oi) else () in
+    Enum.iter (fun ki -> Enum.iter ( fun oi -> make_edge ki oi) edge_to) (BitSet.enum lb.kill_sets.(i))
+
+let build_graph n lbs =
+    let g = G.create() in 
+    let nodes = build_nodes g n in
+    let build_all_edges lb = 
+        Array.iteri (fun i _ -> build_edges g nodes lb i) lb.in_sets in 
+    List.iter build_all_edges lbs
