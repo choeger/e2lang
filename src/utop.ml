@@ -1,5 +1,6 @@
 #require "smart_print" ;;
 #require "batteries" ;;
+#require "ocamlgraph" ;;
 #directory "_build/src" ;;
 #load "e2lang.cmo" ;;
 #load "e2poly.cmo" ;;
@@ -16,7 +17,7 @@ open E2liveness ;;
 let p = Variable(0, 2, Variable(1, 2, Number(1.0), []), []) ;;
 
 
-let test_fac = [|
+(*let test_fac = [|
     Store( IArg 1, ICopy(IntLit 1) ) ;
     Store( BArg 0, IEquals ( (IntVar 0), IntLit 0 ) ) ; (* x0 = 0 ? *)
     Store( BArg 1, IEquals ( (IntVar 0), IntLit 1 ) ) ; (* x0 = 1 ? *)
@@ -33,4 +34,4 @@ let test_fac = [|
     
     Label ("Ret") ;
     Ret (  IArg 1)
-  |]
+  |]*)
