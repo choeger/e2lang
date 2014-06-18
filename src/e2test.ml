@@ -49,7 +49,7 @@ let approx f1 f2 =
     let fabs f = if f < 0. then -1. *. f else f in
     fabs (f1 -. f2) < 0.001
 
-let poly1_id (a, DVal(b)) = ((eval_poly [|a|] poly1) = b.(0)) && (Printf.printf "%f %f\n%!" a b.(1); approx (2. *. a) b.(1))
+let poly1_id (a, DVal(b)) = ((eval_poly [|a|] poly1) = b.(0)) && (approx (2. *. a) b.(1))
 let poly2_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly2) = b
 let poly3_id ((a1, a2, a3), FVal(b)) = (eval_poly [|a1; a2; a3|] poly3) = b
 let poly4_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly4) = b

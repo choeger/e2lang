@@ -129,11 +129,10 @@ type var_table = {
 }
 
 let build_local_vars proto jit size = 
-  let localsize = build_load size "size" jit.builder in
   let make_ivar i = build_alloca jit.int_type (Printf.sprintf "int%d" i) jit.builder in
   let make_fvar i = build_alloca jit.double_type (Printf.sprintf "flt%d" i) jit.builder in
   let make_bvar i = build_alloca jit.bool_type (Printf.sprintf "bool%d" i) jit.builder in
-  let make_dvar i = build_array_alloca jit.double_type localsize (Printf.sprintf "fltArray%d" i) jit.builder in
+  let make_dvar i = build_array_alloca jit.double_type size (Printf.sprintf "fltArray%d" i) jit.builder in
 
    { local_int_vars = Array.init proto.ivars make_ivar ; 
      local_bool_vars = Array.init proto.bvars make_bvar; 
@@ -223,18 +222,23 @@ type globals = {
     params : llvalue;
     order : llvalue;
     size : llvalue;
+    bytesize : llvalue;
     tnp_mul : llvalue;
     tnp_add : llvalue;
     tnp_pow : llvalue;
     tnp_const : llvalue;
     tnp_var : llvalue;
+    memcpy: llvalue;
+    tnp_tmp : llvalue option;
 }
 
 let build_copy_array src tgt globals jit =
-    let cargs = [|globals.params; globals.order; tgt; const_float jit.double_type 0.|] in
+    let args = [|tgt; src; globals.bytesize|] in
+    build_call globals.memcpy args "" jit.builder
+    (*let cargs = [|globals.params; globals.order; tgt; const_float jit.double_type 0.|] in
     build_call globals.tnp_const cargs "" jit.builder;
     let args = [|globals.params; globals.order; tgt; src; tgt|] in
-    ignore (build_call globals.tnp_add args "" jit.builder)
+    ignore (build_call globals.tnp_add args "" jit.builder)*)
 
 let build_stmt vt globals f jit = function
     | Store (FArg var, expr) ->
@@ -247,8 +251,10 @@ let build_stmt vt globals f jit = function
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
     | Store (DArg var, DMul (v1, v2)) ->
-            let args:llvalue array = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
-            ignore (build_call globals.tnp_mul args "" jit.builder)
+            let Some(tmp) = globals.tnp_tmp in
+            let args:llvalue array = [|globals.params; globals.order; tmp; vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
+            build_call globals.tnp_mul args "" jit.builder;
+            ignore(build_copy_array tmp vt.local_dvar_vars.(var) globals jit)
     | Store (DArg var, DAdd (v1, v2)) ->
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
             ignore (build_call globals.tnp_add args "" jit.builder)
@@ -259,7 +265,7 @@ let build_stmt vt globals f jit = function
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); build_float_value vt jit f|] in
             ignore (build_call globals.tnp_const args "" jit.builder)
     | Store (DArg var, DCopy v) ->
-            build_copy_array vt.local_dvar_vars.(v) vt.local_dvar_vars.(var) globals jit
+            ignore(build_copy_array vt.local_dvar_vars.(v) vt.local_dvar_vars.(var) globals jit)
     | Ret (FArg var) ->
             let retval = build_float_value vt jit (FloatVar var) in
             ignore (build_ret retval jit.builder)
@@ -311,7 +317,7 @@ let build_store_param jit params vt globals pidx = function
     | IArg i -> ignore (build_store params.(pidx) vt.local_int_vars.(i) jit.builder)
     | FArg i -> ignore (build_store params.(pidx) vt.local_float_vars.(i) jit.builder)
     | BArg i -> ignore (build_store params.(pidx) vt.local_bool_vars.(i) jit.builder)
-    | DArg i -> build_copy_array params.(pidx) vt.local_dvar_vars.(i) globals jit
+    | DArg i -> ignore (build_copy_array params.(pidx) vt.local_dvar_vars.(i) globals jit)
 
 let build_store_params jit proto params vt globals =
     Array.iteri (build_store_param jit params vt globals) proto.args
@@ -326,16 +332,19 @@ let build_function jit blist proto name globals =
     
     let par = build_load globals.params "params" jit.builder in
     let ord = build_load globals.order "order" jit.builder in
-    let newglobals = {params=par; order=ord; size=globals.size;tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var} in
+    let size = build_load globals.size "size" jit.builder in
+    let bytesize = build_shl size (const_int jit.int_type 3) "bytesize" jit.builder in 
+    let tmp = build_array_alloca jit.double_type size "tmp" jit.builder in
+    let newglobals = {params=par; order=ord; size=globals.size; bytesize=bytesize; tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var;memcpy=globals.memcpy;tnp_tmp=Some(tmp)} in
 
-    let vt = build_local_vars proto jit globals.size in
+    let vt = build_local_vars proto jit size in
     let _ = build_store_params jit proto (params f) vt newglobals in
     let map = build_llvm_blocks vt newglobals jit blist f in
     build_links jit map vt blist;
     position_at_end init_block jit.builder;
     build_br (StrMap.find "start" map) jit.builder;
     Llvm_analysis.assert_valid_function f;
-    (*dump_value(f)*);
+    dump_value(f);
     PassManager.run_function f jit.the_fpm;
     f
 
@@ -367,7 +376,9 @@ let build_module_preamble jit =
     let constf = declare_function "op_tnp_number_write_constant" constt jit.the_module in
     let vart = function_type (void_type jit.jit_context) [|jit.int_type; jit.int_type; jit.dvar_type; jit.double_type; jit.int_type |] in
     let varf = declare_function "op_tnp_number_write_variable" vart jit.the_module in
-    {params=param;order;size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf}
+    let copyt = function_type (void_type jit.jit_context) [|jit.dvar_type; jit.dvar_type; jit.int_type|] in
+    let copyf = declare_function "memcpy" copyt jit.the_module in
+    {params=param;order;size;bytesize=size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf;memcpy=copyf;tnp_tmp=None}
 
 let build_module (Proc (proto, stmts)) =
     let jit = optimizing_jit_compiler in

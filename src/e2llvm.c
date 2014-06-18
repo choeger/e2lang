@@ -18,12 +18,17 @@
 #include <caml/memory.h>
 
 #include <stdio.h>
+#include <string.h>
 
-void op_tnp_number_add(int, int, double*, double*, double*);
+//void op_tnp_number_add(int, int, double*, double*, double*);
 void op_tnp_number_mult(int, int, double*, double*, double*);
 void op_tnp_number_pow(int, int, double*, double*, int);
 void op_tnp_number_write_constant(int, int, double*, double);
 void op_tnp_number_write_variable(int, int, double*, double, int);
+
+void op_tnp_copy(int params, int order, double* target, double* source) {
+    memcpy(target, source, params*order*8);
+}
 
 CAMLprim value ints(int i1, int i2) {
     printf("i1: %d\ti2: %d\n", Int_val(i1), Int_val(i2));
