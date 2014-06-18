@@ -27,38 +27,20 @@ let stmts_live stmts next =
         | Store (DArg d, DMul (d1,d2)) -> BitSet.set gen_sets.(i) d1;
                                           BitSet.set gen_sets.(i) d2;
                                           BitSet.set kill_sets.(i) d
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Store (DArg d, DAdd (d1,d2)) -> BitSet.set gen_sets.(i) d1;  
                                           BitSet.set gen_sets.(i) d2;
                                           BitSet.set kill_sets.(i) d
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Store (DArg d, DPwr(_,d1))   -> BitSet.set gen_sets.(i) d1;
                                           BitSet.set kill_sets.(i) d
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Store (DArg d, DLoadF _)     -> BitSet.set kill_sets.(i) d
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Store (DArg d, DCopy d1)     -> BitSet.set gen_sets.(i) d1;
                                           BitSet.set kill_sets.(i) d;
                                           BitSet.set id_sets.(i) d1
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Store (DArg d, Call (s, args)) ->
                 Array.iter (function 
                     | DArg d -> BitSet.set gen_sets.(i) d
                     | _ -> () ) args;
                 BitSet.set kill_sets.(i) d
-                                          ;Printf.printf "setting ks entry %d in %d\n" d i;
-                                          BitSet.print IO.stdout kill_sets.(i);
-                                          Printf.printf "\n%!"
         | Ret (DArg d) -> BitSet.set gen_sets.(i) d;
                           BitSet.set return_set d;
         | _ -> ()
@@ -94,27 +76,10 @@ let rec succ_in lb = match (Lazy.force lb.next) with
             BitSet.union set1 set2
 
 let update_stmt lb i =
-    (*Printf.printf "out_set before: ";
-    BitSet.print IO.stdout lb.out_sets.(i);
-    Printf.printf " - kill_set before: ";
-    BitSet.print IO.stdout lb.kill_sets.(i);
-    Printf.printf "- gen_set before: ";
-    BitSet.print IO.stdout lb.gen_sets.(i);
-    Printf.printf "\n%!";*)
     let new_in = BitSet.union lb.gen_sets.(i) ( BitSet.diff lb.out_sets.(i) lb.kill_sets.(i)) in
     let in_changed = new_in <> lb.in_sets.(i) in
-    (*Printf.printf "stmt %d - old_in:" i;
-    BitSet.print IO.stdout lb.in_sets.(i);
-    Printf.printf "; new_in:";
-    BitSet.print IO.stdout new_in;
-    Printf.printf "\n%!";*)
     lb.in_sets.(i) <- new_in;
     let new_out = if i = ((Array.length lb.in_sets) - 1) then succ_in lb else lb.in_sets.(i+1) in
-    (*Printf.printf "stmt %d - old_out:" i;
-    BitSet.print IO.stdout lb.out_sets.(i);
-    Printf.printf "; new_out:";
-    BitSet.print IO.stdout new_out;
-    Printf.printf "\n%!";*)
     let out_changed = new_out <> lb.out_sets.(i) in
     lb.out_sets.(i) <- new_out;
     in_changed || out_changed
@@ -174,3 +139,35 @@ module Dot = Graph.Graphviz.Dot(struct
 end)
 
 let print_graph g = Dot.output_graph Pervasives.stdout g
+
+let sat_degree g v coloring = 
+     let list_neigh succ l = if List.mem coloring.(succ) l || coloring.(succ) = -1 then l else coloring.(succ)::l in
+     let neighbours = G.fold_succ list_neigh g v [] in
+     List.length neighbours
+
+let color g index coloring = 
+     let list_neigh v l = coloring.(v)::l in
+     let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
+     let vertex_color = List.fold_left (fun newcolor color -> 
+                                if newcolor = color then newcolor+1 else color) 0 neighbours in
+    Array.set coloring index vertex_color
+            
+let color_graph g = 
+    let size_g = G.nb_vertex g in
+    let coloring = Array.make size_g (-1) in
+    let rec c_node ncn = 
+        if ncn = size_g then ()
+        else
+            let find_index v (max,pos) = 
+                if coloring.(v) = -1 then
+                    let d = sat_degree g v coloring in
+                    if d > max then (d,v) else (max,pos)
+                else (max,pos) in 
+            let (_,index) = G.fold_vertex find_index g (-1,0) in
+            color g index coloring; c_node (ncn+1)
+    in
+    c_node 0;
+    coloring
+
+
+            
