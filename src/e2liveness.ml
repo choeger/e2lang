@@ -97,6 +97,11 @@ let iterate_blocks lbs =
 let rec iterate_fp lbs =
     if iterate_blocks lbs then iterate_fp lbs else () 
 
+let build_lbs blist =
+    let lbs = block_live blist in
+    iterate_fp lbs;
+    lbs
+
 open Graph
 
 module IntMod = struct
@@ -145,11 +150,11 @@ let sat_degree g v coloring =
      let neighbours = G.fold_succ list_neigh g v [] in
      List.length neighbours
 
-let color g index coloring = 
-     let list_neigh v l = coloring.(v)::l in
+let color g index coloring =
+     let list_neigh v l = if coloring.(v) <> -1 then coloring.(v)::l else l in
      let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
      let vertex_color = List.fold_left (fun newcolor color -> 
-                                if newcolor = color then newcolor+1 else color) 0 neighbours in
+                                if newcolor = color then newcolor+1 else newcolor) 0 neighbours in
     Array.set coloring index vertex_color
             
 let color_graph g = 
