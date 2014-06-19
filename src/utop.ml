@@ -16,6 +16,11 @@ open E2liveness ;;
 
 let p = Variable(0, 2, Variable(1, 2, Number(1.0), []), []) ;;
 
+let Proc(proto, stmts) = poly_to_e2 p 2 ;;
+
+let lbs = block_live (build stmts) ;;
+
+iterate_fp lbs ;;
 
 (*let test_fac = [|
     Store( IArg 1, ICopy(IntLit 1) ) ;

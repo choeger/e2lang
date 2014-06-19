@@ -116,7 +116,12 @@ let build_edges g nodes lb i =
     let out_set = BitSet.diff lb.out_sets.(i) lb.id_sets.(i) in
     let edge_to = BitSet.enum out_set in
     let make_edge ki oi =
-        if ki <> oi then G.add_edge g nodes.(ki) nodes.(oi) else () in
+        if ki <> oi
+        then (
+            G.add_edge g nodes.(ki) nodes.(oi);
+            G.add_edge g nodes.(oi) nodes.(ki)
+        ) else ()
+    in
     Enum.iter (fun ki -> Enum.iter ( fun oi -> make_edge ki oi) edge_to) (BitSet.enum lb.kill_sets.(i))
 
 let build_graph n lbs =
@@ -127,18 +132,29 @@ let build_graph n lbs =
     List.iter build_all_edges lbs;
     g
 
-module Dot = Graph.Graphviz.Dot(struct
-    include G (* use the graph module from above *)
-    let edge_attributes e = []
-    let default_edge_attributes _ = []
-    let get_subgraph _ = None
-    let vertex_attributes _ = [`Shape `Circle]
-    let vertex_name v = string_of_int v
-    let default_vertex_attributes _ = []
-    let graph_attributes _ = []
-end)
+let default_colors = [|0x00FF00; 0x0000FF; 0xFF0000; 0x990099; 0x999900; 0xFFFFFF; 0x000000; 0x999999; 0x44FF44; 0x4444FF; 0xFF4444|]
 
-let print_graph g = Dot.output_graph Pervasives.stdout g
+module Dot =
+    struct
+        let colors : int array = Array.make 50 0;
+        include Graph.Graphviz.Dot(struct
+            include G (* use the graph module from above *)
+            let edge_attributes e = []
+            let default_edge_attributes _ = []
+            let get_subgraph _ = None
+            let vertex_attributes v =
+                let color = default_colors.(colors.(v)) in
+                [`Shape `Circle; `Fillcolor color; `Style `Filled]
+            let vertex_name v = string_of_int v
+            let default_vertex_attributes _ = []
+            let graph_attributes _ = []
+        end)
+    end
+
+let print_graph g =
+    let oc = Pervasives.open_out "graph.dot" in
+    Dot.output_graph oc g;
+    Pervasives.close_out oc
 
 let sat_degree g v coloring = 
      let list_neigh succ l = if List.mem coloring.(succ) l || coloring.(succ) = -1 then l else coloring.(succ)::l in
@@ -146,11 +162,15 @@ let sat_degree g v coloring =
      List.length neighbours
 
 let color g index coloring = 
-     let list_neigh v l = coloring.(v)::l in
-     let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
-     let vertex_color = List.fold_left (fun newcolor color -> 
-                                if newcolor = color then newcolor+1 else color) 0 neighbours in
-    Array.set coloring index vertex_color
+    let list_neigh v l = coloring.(v)::l in
+    let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
+    Printf.printf "%d: " index;
+    List.iter (Printf.printf "%d ") neighbours;
+    Printf.printf "\n%!";
+    let vertex_color = List.fold_left (fun newcolor color -> 
+                                if newcolor = color then newcolor+1 else newcolor) 0 neighbours in
+    Array.set coloring index vertex_color;
+    Dot.colors.(index) <- vertex_color
             
 let color_graph g = 
     let size_g = G.nb_vertex g in
@@ -167,7 +187,4 @@ let color_graph g =
             color g index coloring; c_node (ncn+1)
     in
     c_node 0;
-    coloring
-
-
-            
+    coloring 
