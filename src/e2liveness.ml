@@ -166,8 +166,12 @@ let sat_degree g v coloring =
      let neighbours = G.fold_succ list_neigh g v [] in
      List.length neighbours
 
-let color g index coloring = 
-    let list_neigh v l = coloring.(v)::l in
+let degree g v = 
+     let neighbours = G.fold_succ ( fun succ l -> succ::l) g v [] in
+     List.length neighbours
+
+let color g index coloring =
+    let list_neigh v l = if coloring.(v) <> -1 then coloring.(v)::l else l in
     let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
     let vertex_color = List.fold_left (fun newcolor color -> 
                                 if newcolor = color then newcolor+1 else newcolor) 0 neighbours in
@@ -180,11 +184,15 @@ let color_graph g =
     let rec c_node ncn = 
         if ncn = size_g then ()
         else
-            let find_index v (max,pos) = 
+            let find_index v (max,index) = 
                 if coloring.(v) = -1 then
                     let d = sat_degree g v coloring in
-                    if d > max then (d,v) else (max,pos)
-                else (max,pos) in 
+                    if d > max then (d,v) else 
+                    if d = max then
+                        if degree g v > degree g index then (d,v)
+                        else (d,index)
+                    else (max,index)
+                else (max,index) in 
             let (_,index) = G.fold_vertex find_index g (-1,0) in
             color g index coloring; c_node (ncn+1)
     in
