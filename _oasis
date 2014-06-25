@@ -52,3 +52,12 @@ Executable e2tests
 Test e2test
   Type: custom (0.3)
   Command: $e2tests
+
+Executable e2main
+  Path: src
+  CompiledObject: best
+  MainIs: e2main.ml
+  Install: false
+  CCLib: -ltnp
+  DllLib: libtnp
+  BuildDepends: e2lang

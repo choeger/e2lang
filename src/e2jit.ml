@@ -133,7 +133,7 @@ let build_local_vars proto jit size =
   let make_fvar i = build_alloca jit.double_type (Printf.sprintf "flt%d" i) jit.builder in
   let make_bvar i = build_alloca jit.bool_type (Printf.sprintf "bool%d" i) jit.builder in
   let make_dvar i = build_array_alloca jit.double_type size (Printf.sprintf "fltArray%d" i) jit.builder in
-
+  Printf.printf "--- dvars: %d\n%!" proto.dvars;
    { local_int_vars = Array.init proto.ivars make_ivar ; 
      local_bool_vars = Array.init proto.bvars make_bvar; 
      local_float_vars = Array.init proto.fvars make_fvar;
@@ -322,6 +322,33 @@ let build_store_param jit params vt globals pidx = function
 let build_store_params jit proto params vt globals =
     Array.iteri (build_store_param jit params vt globals) proto.args
 
+let build_function_decl jit proto name =
+    let llargs = Array.concat [Array.map (llvm_type jit) proto.args; if proto.ret == DRet then [|jit.dvar_type|] else [||]] in
+    let ft = function_type (llvm_rettype jit proto.ret) llargs in
+    declare_function name ft jit.the_module
+
+let build_function_def jit f blist proto globals =
+    let init_block = append_block jit.jit_context "init" f in
+    let _ = position_at_end init_block jit.builder in
+    
+    let par = build_load globals.params "params" jit.builder in
+    let ord = build_load globals.order "order" jit.builder in
+    let size = build_load globals.size "size" jit.builder in
+    let bytesize = build_shl size (const_int jit.int_type 3) "bytesize" jit.builder in 
+    let tmp = build_array_alloca jit.double_type size "tmp" jit.builder in
+    let newglobals = {params=par; order=ord; size=globals.size; bytesize=bytesize; tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var;memcpy=globals.memcpy;tnp_tmp=Some(tmp)} in
+
+    let vt = build_local_vars proto jit size in
+    let _ = build_store_params jit proto (params f) vt newglobals in
+    let map = build_llvm_blocks vt newglobals jit blist f in
+    build_links jit map vt blist;
+    position_at_end init_block jit.builder;
+    build_br (StrMap.find "start" map) jit.builder;
+    Llvm_analysis.assert_valid_function f;
+    (*dump_value(f);*)
+    PassManager.run_function f jit.the_fpm;
+    f
+
 (* TODO: finish up *)
 let build_function jit blist proto name globals = 
     let llargs = Array.concat [Array.map (llvm_type jit) proto.args; if proto.ret == DRet then [|jit.dvar_type|] else [||]] in
@@ -344,7 +371,7 @@ let build_function jit blist proto name globals =
     position_at_end init_block jit.builder;
     build_br (StrMap.find "start" map) jit.builder;
     Llvm_analysis.assert_valid_function f;
-    dump_value(f);
+    (*dump_value(f);*)
     PassManager.run_function f jit.the_fpm;
     f
 
@@ -380,14 +407,16 @@ let build_module_preamble jit =
     let copyf = declare_function "memcpy" copyt jit.the_module in
     {params=param;order;size;bytesize=size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf;memcpy=copyf;tnp_tmp=None}
 
-let build_module (proto, bbs) =
+let build_module fmap =
     let jit = optimizing_jit_compiler in
-    let globals = build_module_preamble optimizing_jit_compiler in
-    let f = build_function optimizing_jit_compiler bbs proto "test" globals in
-    let m = pointer_to_method jit.the_execution_engine f in
-    dump_module optimizing_jit_compiler.the_module;
-    let Some(set_meta) = lookup_function "set_meta" jit.the_module in
+    let globals = build_module_preamble jit in
+    (*let f = build_function jit bbs proto "test" globals in*)
+    let fts = StrMap.mapi (fun name (proto, bbs) -> (build_function_decl jit proto name, proto, bbs)) fmap in
+    StrMap.iter (fun name (f, proto, bbs) -> (build_function_def jit f bbs proto globals; ())) fts;
+    (*let m = pointer_to_method jit.the_execution_engine f in*)
+    dump_module jit.the_module;
+    ()(*let Some(set_meta) = lookup_function "set_meta" jit.the_module in
     eval_ii (pointer_to_method jit.the_execution_engine set_meta) 1 0;
     let ret = [|0.; 0.|] in
     eval_dd m [|2.; 3.5|] ret;
-    Printf.printf "(%f, %f)\n%!" ret.(0) ret.(1)
+    Printf.printf "(%f, %f)\n%!" ret.(0) ret.(1)*)
