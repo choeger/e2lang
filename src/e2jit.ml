@@ -251,10 +251,14 @@ let build_stmt vt globals f jit = function
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
     | Store (DArg var, DMul (v1, v2)) ->
-            let Some(tmp) = globals.tnp_tmp in
-            let args:llvalue array = [|globals.params; globals.order; tmp; vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
+            let dest =
+                if var = v1 || var = v2 then
+                    let Some(tmp) = globals.tnp_tmp in
+                tmp
+                else vt.local_dvar_vars.(var) in
+            let args:llvalue array = [|globals.params; globals.order; dest; vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
             build_call globals.tnp_mul args "" jit.builder;
-            ignore(build_copy_array tmp vt.local_dvar_vars.(var) globals jit)
+            if var = v1 || var = v2 then ignore(build_copy_array dest vt.local_dvar_vars.(var) globals jit) else ()
     | Store (DArg var, DAdd (v1, v2)) ->
             let args = [|globals.params; globals.order; vt.local_dvar_vars.(var); vt.local_dvar_vars.(v1); vt.local_dvar_vars.(v2)|] in
             ignore (build_call globals.tnp_add args "" jit.builder)
