@@ -31,6 +31,7 @@ open E2poly
 open Kaputt.Abbreviations
 open E2jit
 open E2intpr
+open E2basicblock
 
 external twoInts : int -> int -> unit = "ints"
 
@@ -61,7 +62,7 @@ let () =
   (*  twoInts 1 2;
     test_tnp_constant () ;
     build_test "fac" (Proc (fac_proto, test_fac));*)
-    build_module proc;
+  build_module (proto, build ([| Ret (DArg 0) |]));
   Printf.printf("Running...\n") ;
   (* simple tests are provided using this syntax: *)
   Test.add_simple_test

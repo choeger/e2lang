@@ -176,13 +176,14 @@ let color g index coloring =
     let vertex_color = List.fold_left (fun newcolor color -> 
                                 if newcolor = color then newcolor+1 else newcolor) 0 neighbours in
     Array.set coloring index vertex_color;
-    Dot.colors.(index) <- vertex_color
+    Dot.colors.(index) <- vertex_color;
+    vertex_color
             
 let color_graph g = 
     let size_g = G.nb_vertex g in
     let coloring = Array.make size_g (-1) in
     let rec c_node ncn = 
-        if ncn = size_g then ()
+        if ncn = size_g then 0
         else
             let find_index v (max,index) = 
                 if coloring.(v) = -1 then
@@ -194,7 +195,32 @@ let color_graph g =
                     else (max,index)
                 else (max,index) in 
             let (_,index) = G.fold_vertex find_index g (-1,0) in
-            color g index coloring; c_node (ncn+1)
+            let c1 = color g index coloring in
+            let c2 = c_node (ncn+1) in
+            if c1 > c2 then c1 else c2
     in
-    c_node 0;
-    coloring 
+    let max = c_node 0 in
+    (coloring, max)
+
+let apply_coloring_to_expr coloring =
+    let col i = coloring.(i) in
+    function
+        | DMul (a1, a2) -> DMul (col a1, col a2)
+        | DAdd (a1, a2) -> DAdd (col a1, col a2)
+        | DPwr (i, a)   -> DPwr (i, col a)
+        | DCopy (a)     -> DCopy (col a)
+        | e             -> e
+
+let apply_coloring_to_stmt coloring =
+    let col i = coloring.(i) in
+    function
+        | Store (DArg c, e) -> Store (DArg (col c), apply_coloring_to_expr coloring e)
+        | Ret (DArg c)   -> Ret (DArg (col c))
+        | s                 -> s
+
+let apply_coloring_to_block coloring bb = 
+    let stmts = Array.map (apply_coloring_to_stmt coloring) bb.stmts in
+    {name=bb.name; stmts=stmts; next=bb.next}
+
+let apply_coloring coloring =
+    List.map (apply_coloring_to_block coloring)

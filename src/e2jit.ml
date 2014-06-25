@@ -380,10 +380,10 @@ let build_module_preamble jit =
     let copyf = declare_function "memcpy" copyt jit.the_module in
     {params=param;order;size;bytesize=size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf;memcpy=copyf;tnp_tmp=None}
 
-let build_module (Proc (proto, stmts)) =
+let build_module (proto, bbs) =
     let jit = optimizing_jit_compiler in
     let globals = build_module_preamble optimizing_jit_compiler in
-    let f = build_function optimizing_jit_compiler (build stmts) proto "test" globals in
+    let f = build_function optimizing_jit_compiler bbs proto "test" globals in
     let m = pointer_to_method jit.the_execution_engine f in
     dump_module optimizing_jit_compiler.the_module;
     let Some(set_meta) = lookup_function "set_meta" jit.the_module in
