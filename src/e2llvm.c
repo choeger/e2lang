@@ -69,10 +69,24 @@ CAMLprim value d_var(value p, value o, double* dst, value val, int n) {
     CAMLreturn0;
 }
 
-CAMLprim value eval_method_dd(void *p, double* arg, double* ret) {
+CAMLprim value eval_method_dd1(void *p, double* arg, double* ret) {
     CAMLparam3(p, arg, ret);
     void (*f)(double*, double*) = p;
     f(arg, ret);
+    CAMLreturn0;
+}
+
+CAMLprim value eval_method_dd2(void *p, double* arg1, double* arg2, double* ret) {
+    CAMLparam4(p, arg1, arg2, ret);
+    void (*f)(double*, double*, double*) = p;
+    f(arg1, arg2, ret);
+    CAMLreturn0;
+}
+
+CAMLprim value eval_method_dd3(void *p, double* arg1, double* arg2, double* arg3, double* ret) {
+    CAMLparam5(p, arg1, arg2, arg3, ret);
+    void (*f)(double*, double*, double*, double*) = p;
+    f(arg1, arg2, arg3, ret);
     CAMLreturn0;
 }
 

@@ -43,7 +43,7 @@ external pointer_to_method : ExecutionEngine.t -> Llvm.llvalue -> method_ptr = "
 
 external eval_method_int : method_ptr -> int = "eval_method_int"
 
-external eval_dd : method_ptr -> der_val -> der_val -> unit = "eval_method_dd"
+external eval_dd : method_ptr -> der_val -> der_val -> unit = "eval_method_dd1"
 external eval_ii : method_ptr -> int -> int -> unit = "eval_method_ii"
 
 external eval__i_i : method_ptr -> int -> int = "eval__i_i"
@@ -201,6 +201,7 @@ let build_expr vt jit = function
             build_not b "bool_not" jit.builder
     | BCopy a -> build_bool_value vt jit a
     | Call (name,args) -> 
+            Printf.printf "calling";
             let callee =
                 match lookup_function name jit.the_module with
                 | Some callee -> callee (* contains the llvm value of the function *) 
@@ -376,7 +377,7 @@ let build_function jit blist proto name globals =
     build_br (StrMap.find "start" map) jit.builder;
     Llvm_analysis.assert_valid_function f;
     (*dump_value(f);*)
-    PassManager.run_function f jit.the_fpm;
+    (*PassManager.run_function f jit.the_fpm;*)
     f
 
 (* define global variables size,params and order *)
@@ -424,3 +425,15 @@ let build_module fmap =
     let ret = [|0.; 0.|] in
     eval_dd m [|2.; 3.5|] ret;
     Printf.printf "(%f, %f)\n%!" ret.(0) ret.(1)*)
+
+let get_pointer name =
+    let jit = optimizing_jit_compiler in
+    let Some(func) = lookup_function name jit.the_module in
+    pointer_to_method jit.the_execution_engine func
+
+
+
+
+
+
+
