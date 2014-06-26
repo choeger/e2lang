@@ -12,9 +12,10 @@ let () =
     let bbs1 = build stmts in
     let (proto2, bbs2) = optimize (Proc (proto1, stmts)) in
     let fmap = StrMap.add "optimized" (proto2, bbs2) (StrMap.add "unoptimized" (proto1, bbs1) StrMap.empty) in
+    (*let fmap = StrMap.add "optimized" (proto2, bbs2) StrMap.empty in*)
     build_module fmap;
     let pointer = get_pointer "set_meta" in
-    eval_ii pointer 0 0;
+    eval_ii pointer 3 0;
     let pointer = get_pointer "optimized" in
     let res = [|0.; 0.; 0.; 0.|] in
     eval_dd pointer [|2.; 1.; 0.; 0.|] [|3.; 0.; 1.; 0.|] [|1.; 0.; 0.; 1.|] res;

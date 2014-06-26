@@ -51,7 +51,23 @@ let stmts_live stmts next =
          gen_sets = gen_sets; kill_sets = kill_sets; id_sets = id_sets;
          return_set = return_set; next = next}
 
-let block_live blist =
+let increase_array a =
+    Array.init ((Array.length a)+1) (fun i -> if i == 0 then BitSet.empty () else a.(i-1))
+
+(*ks is inintial kill set *)
+let init_kill map ks =
+    let first_block = StrMap.find "start" map in
+    let gen_sets = increase_array first_block.gen_sets in
+    let kill_sets = increase_array first_block.kill_sets in
+    let id_sets = increase_array first_block.id_sets in
+    let in_sets = increase_array first_block.in_sets in
+    let out_sets = increase_array first_block.out_sets in
+    BitSet.unite kill_sets.(0) ks; 
+    let new_start = {in_sets; out_sets; gen_sets; kill_sets; id_sets; return_set = first_block.return_set; next = first_block.next} in
+    StrMap.add "start" new_start map
+
+
+let block_live blist ks =
     let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
     let next map bbn = match bbn with
         | NoBlock -> NoLBlock
@@ -59,7 +75,9 @@ let block_live blist =
         | CondBlocks (_,b1,b2) -> TwoLBlocks (StrMap.find b1 map,StrMap.find b2 map) in
     let rec map = lazy (StrMap.mapi (fun name bb -> stmts_live bb.stmts (lazy (nextc bb))) bbmap)
     and nextc bb = next (Lazy.force map) bb.next in
-    List.map (fun bb -> StrMap.find bb.name (Lazy.force map)) blist
+    let new_map = init_kill (Lazy.force map) ks in
+    List.map (fun bb -> StrMap.find bb.name new_map) blist
+
 
 let rec succ_in lb = match (Lazy.force lb.next) with
     | NoLBlock -> lb.return_set
@@ -97,8 +115,12 @@ let iterate_blocks lbs =
 let rec iterate_fp lbs =
     if iterate_blocks lbs then iterate_fp lbs else () 
 
-let build_lbs blist =
-    let lbs = block_live blist in
+let build_lbs blist args =
+    let ks = BitSet.empty() in
+    Array.iter ( fun arg -> match arg with 
+                            DArg d -> BitSet.set ks d
+                            | _ -> ()) args; 
+    let lbs = block_live blist ks in
     iterate_fp lbs;
     lbs
 
@@ -209,6 +231,11 @@ let apply_coloring_to_expr coloring =
         | DAdd (a1, a2) -> DAdd (col a1, col a2)
         | DPwr (i, a)   -> DPwr (i, col a)
         | DCopy (a)     -> DCopy (col a)
+        | Call (n, args) -> 
+                let col_args = Array.map (fun arg -> match arg with
+                                                     DArg i -> DArg (col i)
+                                                     | _ -> arg  ) args in
+                Call (n, col_args)
         | e             -> e
 
 let apply_coloring_to_stmt coloring =
@@ -224,3 +251,4 @@ let apply_coloring_to_block coloring bb =
 
 let apply_coloring coloring =
     List.map (apply_coloring_to_block coloring)
+
