@@ -54,7 +54,7 @@ let stmts_live stmts next =
 let increase_array a =
     Array.init ((Array.length a)+1) (fun i -> if i == 0 then BitSet.empty () else a.(i-1))
 
-(*ks is inintial kill set *)
+(*ks is initial kill set *)
 let init_kill map ks =
     let first_block = StrMap.find "start" map in
     let gen_sets = increase_array first_block.gen_sets in
@@ -200,10 +200,14 @@ let color g index coloring =
     Array.set coloring index vertex_color;
     Dot.colors.(index) <- vertex_color;
     vertex_color
-            
-let color_graph g = 
+
+(*no intruction just parameters- how many registers ? *)            
+let color_graph g args = 
     let size_g = G.nb_vertex g in
     let coloring = Array.make size_g (-1) in
+    Array.iter ( fun arg -> match arg with 
+                            DArg d -> Array.set coloring d d; Dot.colors.(d) <- d
+                            | _ -> ()) args;
     let rec c_node ncn = 
         if ncn = size_g then 0
         else
