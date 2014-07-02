@@ -226,7 +226,7 @@ let color_graph g args =
             if c1 > c2 then c1 else c2
     in
     let max = c_node 0 in
-    (coloring, max)
+    (coloring, if max < (Array.length args) then (Array.length args) else max)
 
 let apply_coloring_to_expr coloring =
     let col i = coloring.(i) in

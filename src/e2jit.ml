@@ -318,7 +318,7 @@ let build_link jit map vt bb =
 let build_links jit map vt = 
     List.iter ( build_link jit map vt )
 
-let build_store_param jit params vt globals pidx = function
+let build_store_param jit params vt globals pidx = Printf.printf "pidx=%d, params.length=%d\n%!" pidx (Array.length params);function
     | IArg i -> ignore (build_store params.(pidx) vt.local_int_vars.(i) jit.builder)
     | FArg i -> ignore (build_store params.(pidx) vt.local_float_vars.(i) jit.builder)
     | BArg i -> ignore (build_store params.(pidx) vt.local_bool_vars.(i) jit.builder)
@@ -344,8 +344,11 @@ let build_function_def jit f blist proto globals =
     let newglobals = {params=par; order=ord; size=globals.size; bytesize=bytesize; tnp_add=globals.tnp_add;tnp_mul=globals.tnp_mul;tnp_pow=globals.tnp_pow;tnp_const=globals.tnp_const;tnp_var=globals.tnp_var;memcpy=globals.memcpy;tnp_tmp=Some(tmp)} in
 
     let vt = build_local_vars proto jit size in
+    Printf.printf "Post vartable\n%!";
     let _ = build_store_params jit proto (params f) vt newglobals in
+    Printf.printf "Post store params\n%!";
     let map = build_llvm_blocks vt newglobals jit blist f in
+    Printf.printf "Post build_llvm_blocks\n%!";
     build_links jit map vt blist;
     position_at_end init_block jit.builder;
     build_br (StrMap.find "start" map) jit.builder;
