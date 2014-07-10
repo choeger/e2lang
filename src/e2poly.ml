@@ -160,7 +160,7 @@ let rec poly_to_e2_stmts c = function
                     | (lastArr, c'') ->
                             let sumArr = [| Store (DArg c'', DAdd (c',(c''-1))) |] in
                             (Array.concat [firstArr; lastArr; sumArr], c''+1)
-
+(* transforms to e2 all polynoms in the list qs*)
 and build_sum c = function
     | [] -> ([| Store (DArg c, DLoadF (FloatLit 0.) )|], c+1)
     | p :: ps ->

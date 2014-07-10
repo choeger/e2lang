@@ -2,30 +2,43 @@ open E2basicblock
 open Batteries
 open E2lang
 
+(*for each basic block we create an live block l containing information needed for the liveness analysis *)
+ 
 type next_lblock = 
     | NoLBlock
     | OneLBlock of lblock
     | TwoLBlocks of lblock * lblock
 
+(* in_sets : live variables at beginning of statement
+    out_sets : live variables at end of statement
+    gen_sets : read variables
+    kill_sets : overwritten variables
+    id_sets : identity assignment "Instruction i is not of form x:=y"
+    mult_sets : used for multiplication. We eliminate the need of using a temporary variable by colouring the sources and destination differently *)
+      
 and lblock = {
     in_sets : BitSet.t array;
     out_sets : BitSet.t array;
     gen_sets : BitSet.t array;
     kill_sets : BitSet.t array;
     id_sets : BitSet.t array;
+    mult_sets : BitSet.t array;
     return_set : BitSet.t;
     next : next_lblock Lazy.t;
 } 
 
+(* according to the algorithm the read and overwritten variables need to be determined first *)
 let stmts_live stmts next =
-    Printf.printf "new block ------\n%!";
     let gen_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
     let kill_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
     let id_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
+    let mult_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
     let return_set = BitSet.empty () in
     let parse_stmts i = function
         | Store (DArg d, DMul (d1,d2)) -> BitSet.set gen_sets.(i) d1;
                                           BitSet.set gen_sets.(i) d2;
+                                          BitSet.set mult_sets.(i) d1;
+                                          BitSet.set mult_sets.(i) d2;
                                           BitSet.set kill_sets.(i) d
         | Store (DArg d, DAdd (d1,d2)) -> BitSet.set gen_sets.(i) d1;  
                                           BitSet.set gen_sets.(i) d2;
@@ -48,9 +61,11 @@ let stmts_live stmts next =
         Array.iteri parse_stmts stmts;
         {in_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()); 
          out_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ());
-         gen_sets = gen_sets; kill_sets = kill_sets; id_sets = id_sets;
+         gen_sets = gen_sets; kill_sets = kill_sets; id_sets = id_sets; mult_sets;
          return_set = return_set; next = next}
-
+(*
+(*we pretend we have a new statement at the beginning of the statements and it's kill set is updated according to our arguments. Thus we extend each of our sets with one more value. We don't directly update the kill set of the first statement because the first block can be empty or the first instruction can overwrite our arguments *)
+  
 let increase_array a =
     Array.init ((Array.length a)+1) (fun i -> if i == 0 then BitSet.empty () else a.(i-1))
 
@@ -62,12 +77,14 @@ let init_kill map ks =
     let id_sets = increase_array first_block.id_sets in
     let in_sets = increase_array first_block.in_sets in
     let out_sets = increase_array first_block.out_sets in
+    let mult_sets = increase_array first_block.mult_sets in
     BitSet.unite kill_sets.(0) ks; 
-    let new_start = {in_sets; out_sets; gen_sets; kill_sets; id_sets; return_set = first_block.return_set; next = first_block.next} in
+    let new_start = {in_sets; out_sets; gen_sets; kill_sets; id_sets; mult_sets; return_set = first_block.return_set; next = first_block.next} in
     StrMap.add "start" new_start map
+*)
 
-
-let block_live blist ks =
+(* for each block we compute the live block. The result is a list if l blocks *)
+let block_live blist =
     let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
     let next map bbn = match bbn with
         | NoBlock -> NoLBlock
@@ -75,10 +92,10 @@ let block_live blist ks =
         | CondBlocks (_,b1,b2) -> TwoLBlocks (StrMap.find b1 map,StrMap.find b2 map) in
     let rec map = lazy (StrMap.mapi (fun name bb -> stmts_live bb.stmts (lazy (nextc bb))) bbmap)
     and nextc bb = next (Lazy.force map) bb.next in
-    let new_map = init_kill (Lazy.force map) ks in
-    List.map (fun bb -> StrMap.find bb.name new_map) blist
+  (*  let new_map = init_kill (Lazy.force map) ks in*)
+    List.map (fun bb -> StrMap.find bb.name (Lazy.force map)) blist
 
-
+(* we need the in_sets of the successors of a l block for computing the out_sets*)
 let rec succ_in lb = match (Lazy.force lb.next) with
     | NoLBlock -> lb.return_set
     | OneLBlock lbn -> if (Array.length lbn.in_sets) = 0
@@ -93,6 +110,7 @@ let rec succ_in lb = match (Lazy.force lb.next) with
                        else lbn2.in_sets.(0) in
             BitSet.union set1 set2
 
+(*according to the algorithm we compute the in and out sets *) 
 let update_stmt lb i =
     let new_in = BitSet.union lb.gen_sets.(i) ( BitSet.diff lb.out_sets.(i) lb.kill_sets.(i)) in
     let in_changed = new_in <> lb.in_sets.(i) in
@@ -109,18 +127,27 @@ let iterate_stmts lb =
     in 
     it_rec 0
 
+(* in and out sets are computed until no changes occur *) 
 let iterate_blocks lbs =
     List.exists (fun x -> x) (List.map iterate_stmts lbs)
 
+(* ... by  making a fix point recursion. After computing the in and out sets we update the out sets by union with our mult_sets used in case of multiplication for coloring differently the source and target with the goal of eliminating the need of a temporary variable *)
 let rec iterate_fp lbs =
-    if iterate_blocks lbs then iterate_fp lbs else () 
+    if iterate_blocks lbs then iterate_fp lbs else
+        let mult_union lb =
+            let rec mult i = if i >= Array.length lb.out_sets then ()
+                             else (BitSet.unite lb.out_sets.(i) lb.mult_sets.(i); mult (i+1))
+            in mult 0
+        in
+        List.iter mult_union lbs
 
+(* we build all lbocks for our bblocks *)
 let build_lbs blist args =
-    let ks = BitSet.empty() in
+(*    let ks = BitSet.empty() in
     Array.iter ( fun arg -> match arg with 
                             DArg d -> BitSet.set ks d
-                            | _ -> ()) args; 
-    let lbs = block_live blist ks in
+                            | _ -> ()) args; *)
+    let lbs = block_live blist in
     iterate_fp lbs;
     lbs
 
@@ -135,10 +162,12 @@ end
 
 module G = Imperative.Graph.Concrete(IntMod)
 
+(* for each variable we build a vertex *)
 let build_nodes g n = 
     let new_node i = let v = G.V.create i in G.add_vertex g v; v in
     Array.init n new_node
 
+(* according to the algorithm after each instruction i we build an edge between two vertices (they interfere) if instruction i is not of form x := y, x belongs to kill set of i, y belongs to out set of i and x != y *)
 let build_edges g nodes lb i = 
     let out_set = BitSet.diff lb.out_sets.(i) lb.id_sets.(i) in
     let edge_to = BitSet.enum out_set in

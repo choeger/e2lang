@@ -5,6 +5,7 @@ type next_block =
     | OneBlock of string
     | CondBlocks of int * string * string
 
+(*basic block representation *)
 type bblock = {
     name : string;
     stmts : stmt array;
