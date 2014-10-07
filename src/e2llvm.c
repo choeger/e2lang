@@ -35,6 +35,7 @@ CAMLprim value ints(int i1, int i2) {
     return 0;
 }
 
+// the upper left most value will ve initialised by c and all other values by 0 
 CAMLprim value d_const(value params, value order, double* arr, value c) {
     CAMLparam4(params, order, arr, c);
     op_tnp_number_write_constant(Int_val(params), Int_val(order), arr, Double_val(c));
@@ -43,17 +44,13 @@ CAMLprim value d_const(value params, value order, double* arr, value c) {
 
 CAMLprim value d_add(value p, value o, double* dst, double* src1, double* src2) {
     CAMLparam5(p, o, dst, src1, src2);
-    //printf("> (%f, %f) + (%f, %f)", src1[0], src1[1], src2[0], src2[1]);
     op_tnp_number_add(Int_val(p), Int_val(o), dst, src1, src2);
-    //printf("= (%f, %f)\n", dst[0], dst[1]);
     CAMLreturn0;
 }
 
 CAMLprim value d_mul(value p, value o, double* dst, double* src1, double* src2) {
     CAMLparam5(p, o, dst, src1, src2);
-    //printf("> (%f, %f) * (%f, %f)", src1[0], src1[1], src2[0], src2[1]);
     op_tnp_number_mult(Int_val(p), Int_val(o), dst, src1, src2);
-    //printf("= (%f, %f)\n", dst[0], dst[1]);
     CAMLreturn0;
 }
 
