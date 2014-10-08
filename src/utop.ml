@@ -7,6 +7,7 @@
 #load "e2pretty.cmo" ;;
 #load "e2basicblock.cmo" ;;
 #load "e2liveness.cmo" ;;
+#load "e2optimize.cmo" ;;
 
 open E2lang ;;
 open E2pretty ;;
@@ -15,6 +16,9 @@ open E2basicblock ;;
 open E2liveness ;;
 
 let p = Variable(0, 2, Variable(1, 2, Number(1.0), []), []) ;;
+let poly = Variable(0, 2, Variable(1, 1, Number 1., [Variable(2, 3, Number 1.,[])]), [
+               Variable(1, 2, Variable(0, 1, Variable(2, 1, Number 1., []), []), []);
+               Variable(2, 2, Variable(1, 1, Number 1., [Variable(2, 1, Number 1., [])]), [])])
 
 let Proc(proto, stmts) = poly_to_e2 p 2 ;;
 
