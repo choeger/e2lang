@@ -140,7 +140,7 @@ and simplify = function
  *)
 let rec simplify_fix p = let s = simplify p in if s = p then p else simplify_fix s
 
-
+(* Compilation of i^n to e2lang statements *)
 let pow_to_e2 i n c =
     let rec pow i n c = if n = 0
         then [| |]
@@ -148,6 +148,7 @@ let pow_to_e2 i n c =
     in
     Array.append [| Store (DArg c, DLoadF (FloatLit 1.0))|] (pow i n c)
 
+(* Polynom to e2lang compilation *)
 let rec poly_to_e2_stmts c = function
     | Number f -> ([| Store (DArg c, DLoadF (FloatLit f)) |], c+1)
     | Variable (i, n, p, qs) ->
@@ -160,7 +161,7 @@ let rec poly_to_e2_stmts c = function
                     | (lastArr, c'') ->
                             let sumArr = [| Store (DArg c'', DAdd (c',(c''-1))) |] in
                             (Array.concat [firstArr; lastArr; sumArr], c''+1)
-(* transforms to e2 all polynoms in the list qs*)
+(* Transformation of all polynoms in the list qs to e2lang *)
 and build_sum c = function
     | [] -> ([| Store (DArg c, DLoadF (FloatLit 0.) )|], c+1)
     | p :: ps ->
@@ -177,6 +178,7 @@ and build_sum c = function
             buildMul c1 c2 >>= fun arr3 ->
             return (Array.append (Array.append arr1 arr2) arr3)*)
 
+(* Compilation of a polynom to e2 and prototype initialization *)
 let poly_to_e2 p n =
     let rec argList m n = if m == n then [DArg n] else (DArg m) :: (argList (m+1) n) in
     match poly_to_e2_stmts n p with

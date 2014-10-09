@@ -2,8 +2,7 @@ open E2basicblock
 open Batteries
 open E2lang
 
-(*for each basic block we create an live block l containing information needed for the liveness analysis *)
- 
+(* Each basic block is assigned a live block containing information needed for the liveness analysis. *)
 type next_lblock = 
     | NoLBlock
     | OneLBlock of lblock
@@ -27,7 +26,7 @@ and lblock = {
     next : next_lblock Lazy.t;
 } 
 
-(* according to the algorithm the read and overwritten variables need to be determined first *)
+(* According to the algorithm, the read and overwritten variables need to be determined first *)
 let stmts_live stmts next =
     let gen_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
     let kill_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ()) in
@@ -63,27 +62,8 @@ let stmts_live stmts next =
          out_sets = Array.init (Array.length stmts) (fun _ -> BitSet.empty ());
          gen_sets = gen_sets; kill_sets = kill_sets; id_sets = id_sets; mult_sets;
          return_set = return_set; next = next}
-(*
-(*we pretend we have a new statement at the beginning of the statements and it's kill set is updated according to our arguments. Thus we extend each of our sets with one more value. We don't directly update the kill set of the first statement because the first block can be empty or the first instruction can overwrite our arguments *)
-  
-let increase_array a =
-    Array.init ((Array.length a)+1) (fun i -> if i == 0 then BitSet.empty () else a.(i-1))
 
-(*ks is initial kill set *)
-let init_kill map ks =
-    let first_block = StrMap.find "start" map in
-    let gen_sets = increase_array first_block.gen_sets in
-    let kill_sets = increase_array first_block.kill_sets in
-    let id_sets = increase_array first_block.id_sets in
-    let in_sets = increase_array first_block.in_sets in
-    let out_sets = increase_array first_block.out_sets in
-    let mult_sets = increase_array first_block.mult_sets in
-    BitSet.unite kill_sets.(0) ks; 
-    let new_start = {in_sets; out_sets; gen_sets; kill_sets; id_sets; mult_sets; return_set = first_block.return_set; next = first_block.next} in
-    StrMap.add "start" new_start map
-*)
-
-(* for each block we compute the live block. The result is a list if l blocks *)
+(* For each block the live block is computed. The result is a list if l blocks *)
 let block_live blist =
     let bbmap = List.fold_left (fun map bb -> StrMap.add bb.name bb map ) StrMap.empty blist in
     let next map bbn = match bbn with
@@ -95,7 +75,7 @@ let block_live blist =
   (*  let new_map = init_kill (Lazy.force map) ks in*)
     List.map (fun bb -> StrMap.find bb.name (Lazy.force map)) blist
 
-(* we need the in_sets of the successors of a l block for computing the out_sets*)
+(* The in_sets of the successors of a l block are needed for computing the out_sets*)
 let rec succ_in lb = match (Lazy.force lb.next) with
     | NoLBlock -> lb.return_set
     | OneLBlock lbn -> if (Array.length lbn.in_sets) = 0
@@ -110,7 +90,7 @@ let rec succ_in lb = match (Lazy.force lb.next) with
                        else lbn2.in_sets.(0) in
             BitSet.union set1 set2
 
-(*according to the algorithm we compute the in and out sets *) 
+(* According to the algorithm, the in and out sets are computed*)
 let update_stmt lb i =
     let new_in = BitSet.union lb.gen_sets.(i) ( BitSet.diff lb.out_sets.(i) lb.kill_sets.(i)) in
     let in_changed = new_in <> lb.in_sets.(i) in
@@ -131,7 +111,7 @@ let iterate_stmts lb =
 let iterate_blocks lbs =
     List.exists (fun x -> x) (List.map iterate_stmts lbs)
 
-(* ... by  making a fix point recursion. After computing the in and out sets we update the out sets by union with our mult_sets used in case of multiplication for coloring differently the source and target with the goal of eliminating the need of a temporary variable *)
+(* ... by  making a fix point recursion. After computing the in and out sets, the out sets are updated by union with the mult_sets used in case of multiplication for coloring differently the source and target with the goal of eliminating the need of a temporary variable. *)
 let rec iterate_fp lbs =
     if iterate_blocks lbs then iterate_fp lbs else
         let mult_union lb =
@@ -141,7 +121,7 @@ let rec iterate_fp lbs =
         in
         List.iter mult_union lbs
 
-(* we build all lbocks for our bblocks *)
+(* All live bocks are built for the basic blocks. *)
 let build_lbs blist args =
 (*    let ks = BitSet.empty() in
     Array.iter ( fun arg -> match arg with 
@@ -162,12 +142,12 @@ end
 
 module G = Imperative.Graph.Concrete(IntMod)
 
-(* for each variable we build a vertex *)
+(* For each variable a vertex is built. *)
 let build_nodes g n = 
     let new_node i = let v = G.V.create i in G.add_vertex g v; v in
     Array.init n new_node
 
-(* according to the algorithm after each instruction i we build an edge between two vertices (they interfere) if instruction i is not of form x := y, x belongs to kill set of i, y belongs to out set of i and x != y *)
+(* According to the algorithm, after each instruction i we build an edge between two vertices (they interfere) if instruction i is not of form x := y, x belongs to kill set of i, y belongs to out set of i and x != y *)
 let build_edges g nodes lb i = 
     let out_set = BitSet.diff lb.out_sets.(i) lb.id_sets.(i) in
     let edge_to = BitSet.enum out_set in
@@ -180,6 +160,7 @@ let build_edges g nodes lb i =
     in
     Enum.iter (fun ki -> Enum.iter ( fun oi -> make_edge ki oi) edge_to) (BitSet.enum lb.kill_sets.(i))
 
+(* Building of the graph *)
 let build_graph n lbs =
     let g = G.create() in 
     let nodes = build_nodes g n in
@@ -190,6 +171,7 @@ let build_graph n lbs =
 
 let default_colors = [|0x00FF00; 0x0000FF; 0xFF0000; 0x990099; 0x999900; 0xFFFFFF; 0x000000; 0x999999; 0x44FF44; 0x4444FF; 0xFF4444|]
 
+(* Graph tool used for coloring *)
 module Dot =
     struct
         let colors : int array = Array.make 50 0;
@@ -207,20 +189,24 @@ module Dot =
         end)
     end
 
+(* Printing of the graph in the graph.dot file *)
 let print_graph g =
     let oc = Pervasives.open_out "graph.dot" in
     Dot.output_graph oc g;
     Pervasives.close_out oc
 
+(* Computing the saturation degree(the number of neighbours having a different color) for each node *)
 let sat_degree g v coloring = 
      let list_neigh succ l = if List.mem coloring.(succ) l || coloring.(succ) = -1 then l else coloring.(succ)::l in
      let neighbours = G.fold_succ list_neigh g v [] in
      List.length neighbours
 
+(* Computing the number of neighbours for each vertex *)
 let degree g v = 
      let neighbours = G.fold_succ ( fun succ l -> succ::l) g v [] in
      List.length neighbours
 
+(* Coloring of each vertex differently from its neighbours, by chosing the smallest index(representing colors) available *)
 let color g index coloring =
     let list_neigh v l = if coloring.(v) <> -1 then coloring.(v)::l else l in
     let neighbours = List.sort (-) (G.fold_succ list_neigh g index []) in
@@ -230,7 +216,7 @@ let color g index coloring =
     Dot.colors.(index) <- vertex_color;
     vertex_color
 
-(*no intruction just parameters- how many registers ? *)            
+(* Graph coloring algorithm *)          
 let color_graph g args = 
     let size_g = G.nb_vertex g in
     let coloring = Array.make size_g (-1) in
@@ -257,6 +243,7 @@ let color_graph g args =
     let max = c_node 0 in
     (coloring, if max < (Array.length args) then (Array.length args) else max)
 
+(* Allocation of the same memory location to variables in expressions that do not interfere with each other *)
 let apply_coloring_to_expr coloring =
     let col i = coloring.(i) in
     function
@@ -271,6 +258,7 @@ let apply_coloring_to_expr coloring =
                 Call (n, col_args)
         | e             -> e
 
+(* Allocation of the same memory location to variables in statements that do not interfere with each other *)
 let apply_coloring_to_stmt coloring =
     let col i = coloring.(i) in
     function
@@ -278,10 +266,12 @@ let apply_coloring_to_stmt coloring =
         | Ret (DArg c)   -> Ret (DArg (col c))
         | s                 -> s
 
+(* Allocation of the same memory location to variables in the entire block that do not interfere with each other *)
 let apply_coloring_to_block coloring bb = 
     let stmts = Array.map (apply_coloring_to_stmt coloring) bb.stmts in
     {name=bb.name; stmts=stmts; next=bb.next}
 
+(* Allocation of the same memory location to all variables in the program that do not interfere with each other *)
 let apply_coloring coloring =
     List.map (apply_coloring_to_block coloring)
 

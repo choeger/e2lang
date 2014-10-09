@@ -1,17 +1,19 @@
 open E2lang
 
+(* Structure to identify the next block by its name *)
 type next_block =
     | NoBlock
     | OneBlock of string
     | CondBlocks of int * string * string
 
-(*basic block representation *)
+(* Basic block representation *)
 type bblock = {
     name : string;
     stmts : stmt array;
     next : next_block;
 }
 
+(* Recursive function for build the basic blocks, having as input the statements and a name. Each block is assigned a different name, useful for identifying the next block or blocks*)
 let rec build_blocks name stmts = function
     (si, ei) ->
         if ei >= Array.length(stmts)
@@ -39,5 +41,6 @@ let rec build_blocks name stmts = function
                     {name = name; stmts = Array.sub stmts si (ei - si + 1); next = NoBlock}::nb
             | _ -> build_blocks name stmts (si, ei + 1)
 
+(* Calling of the basick block building function with the first block named "start"*)
 let build stmts = build_blocks "start" stmts (0, 0)
 

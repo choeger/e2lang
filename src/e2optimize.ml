@@ -3,6 +3,7 @@ open E2lang
 open E2basicblock
 open E2liveness
 
+(* Building of basic blocks for given statements and prototype. Then followed by liveness analysis and graph construction and coloring. The minimum number of registers is determined, these being equal to the minimum number of colors used for graph coloring. *)
 let optimize (Proc(proto, stmts)) =
     let bbs = build stmts in
     let lbs = build_lbs bbs proto.args in
