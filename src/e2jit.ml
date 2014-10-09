@@ -152,6 +152,8 @@ let llvm_rettype jit = function
   | DRet -> void_type jit.jit_context 
 
 (* generation *)
+
+(* mapping functions for atoms *)
 let build_int_value vt jit = function
     | IntLit n -> const_int jit.int_type n
     | IntVar c -> 
@@ -170,6 +172,7 @@ let build_bool_value vt jit = function
         let pb = vt.local_bool_vars.(c) in
         build_load pb "tempBool" jit.builder
 
+(* create binary expressions; translates atoms via tf *)
 let build_binary_expr f tf v1 v2 str vt jit =
     let tv1 = tf vt jit v1 in
     let tv2 = tf vt jit v2 in
@@ -182,6 +185,7 @@ let build_float_expr f =
 let build_bool_expr f =
     build_binary_expr f build_bool_value
 
+(* build single expression *)
 let build_expr vt jit = function
     | FAdd (a1, a2)     -> build_float_expr build_fadd a1 a2 "fadd_tmp" vt jit
     | FMul (a1, a2)     -> build_float_expr build_fmul a1 a2 "fmul_tmp" vt jit
@@ -201,7 +205,6 @@ let build_expr vt jit = function
             build_not b "bool_not" jit.builder
     | BCopy a -> build_bool_value vt jit a
     | Call (name,args) -> 
-            Printf.printf "calling";
             let callee =
                 match lookup_function name jit.the_module with
                 | Some callee -> callee (* contains the llvm value of the function *) 
@@ -219,20 +222,22 @@ let build_expr vt jit = function
             let arg = Array.map map_args args in (* new array with llvm values *)
             build_call callee arg "call_function" jit.builder 
 
+(* these values are needed for several operations. A globals structs is thus passed to every function from here on (like vt before) *)
 type globals = {
-    params : llvalue;
+    params : llvalue;   (* global variables *)
     order : llvalue;
     size : llvalue;
     bytesize : llvalue;
-    tnp_mul : llvalue;
+    tnp_mul : llvalue;  (* global functions from TNP *)
     tnp_add : llvalue;
     tnp_pow : llvalue;
     tnp_const : llvalue;
     tnp_var : llvalue;
-    memcpy: llvalue;
-    tnp_tmp : llvalue option;
+    memcpy: llvalue;    (* good old memcpy *)
+    tnp_tmp : llvalue option; (* tmp variable for multiplication *)
 }
 
+(* build copy instruction *)
 let build_copy_array src tgt globals jit =
     let args = [|tgt; src; globals.bytesize|] in
     build_call globals.memcpy args "" jit.builder
@@ -241,6 +246,7 @@ let build_copy_array src tgt globals jit =
     let args = [|globals.params; globals.order; tgt; src; tgt|] in
     ignore (build_call globals.tnp_add args "" jit.builder)*)
 
+(* build single statement. Uses build_expr *)
 let build_stmt vt globals f jit = function
     | Store (FArg var, expr) ->
             let llvexpr = build_expr vt jit expr in
@@ -252,6 +258,7 @@ let build_stmt vt globals f jit = function
             let llvexpr = build_expr vt jit expr in
             ignore (build_store llvexpr vt.local_bool_vars.(var) jit.builder)
     | Store (DArg var, DMul (v1, v2)) ->
+            (* multiplication has to ensure dst and args are disjoint *)
             let dest =
                 if var = v1 || var = v2 then
                     let Some(tmp) = globals.tnp_tmp in
@@ -281,6 +288,7 @@ let build_stmt vt globals f jit = function
             let retval = build_bool_value vt jit (BoolVar var) in
             ignore (build_ret retval jit.builder)
     | Ret (DArg var) ->
+            (* DVars are returned via out argument *)
             let params = params f in
             let last_arg = Array.get params ((Array.length params) - 1) in
             build_copy_array vt.local_dvar_vars.(var) last_arg globals jit;
@@ -291,6 +299,7 @@ let build_stmt vt globals f jit = function
 let build_stmts vt globals f jit bb = 
     Array.iter ( build_stmt vt globals f jit ) bb.stmts
 
+(* build llvm basic block *)
 let build_new_block vt globals jit bb f =
     let new_block = append_block jit.jit_context bb.name f in
     position_at_end new_block jit.builder;
@@ -300,6 +309,7 @@ let build_new_block vt globals jit bb f =
 let build_llvm_blocks vt globals jit blist f =
     List.fold_left (fun map bb -> build_new_block vt globals jit bb f map) StrMap.empty blist
 
+(* connect llvm basic block *)
 let build_link jit map vt bb = 
     let llvm_block = StrMap.find bb.name map in 
     position_at_end llvm_block jit.builder;
@@ -318,6 +328,7 @@ let build_link jit map vt bb =
 let build_links jit map vt = 
     List.iter ( build_link jit map vt )
 
+(* build instructions to load arguments to stack variables *)
 let build_store_param jit params vt globals pidx = Printf.printf "pidx=%d, params.length=%d\n%!" pidx (Array.length params);function
     | IArg i -> ignore (build_store params.(pidx) vt.local_int_vars.(i) jit.builder)
     | FArg i -> ignore (build_store params.(pidx) vt.local_float_vars.(i) jit.builder)
@@ -327,15 +338,18 @@ let build_store_param jit params vt globals pidx = Printf.printf "pidx=%d, param
 let build_store_params jit proto params vt globals =
     Array.iteri (build_store_param jit params vt globals) proto.args
 
+(* build function declaration *)
 let build_function_decl jit proto name =
     let llargs = Array.concat [Array.map (llvm_type jit) proto.args; if proto.ret == DRet then [|jit.dvar_type|] else [||]] in
     let ft = function_type (llvm_rettype jit proto.ret) llargs in
     declare_function name ft jit.the_module
 
+(* and definition *)
 let build_function_def jit f blist proto globals =
     let init_block = append_block jit.jit_context "init" f in
     let _ = position_at_end init_block jit.builder in
-    
+   
+    (* globals loaded to be accessible *)
     let par = build_load globals.params "params" jit.builder in
     let ord = build_load globals.order "order" jit.builder in
     let size = build_load globals.size "size" jit.builder in
@@ -357,7 +371,7 @@ let build_function_def jit f blist proto globals =
     PassManager.run_function f jit.the_fpm;
     f
 
-(* TODO: finish up *)
+(* probably not needed anymore; does the work of build*_decl and build*_def *)
 let build_function jit blist proto name globals = 
     let llargs = Array.concat [Array.map (llvm_type jit) proto.args; if proto.ret == DRet then [|jit.dvar_type|] else [||]] in
     let ft = function_type (llvm_rettype jit proto.ret) llargs in
@@ -415,6 +429,7 @@ let build_module_preamble jit =
     let copyf = declare_function "memcpy" copyt jit.the_module in
     {params=param;order;size;bytesize=size;tnp_add=addf;tnp_mul=mulf;tnp_pow=powf;tnp_const=constf;tnp_var=varf;memcpy=copyf;tnp_tmp=None}
 
+(* build whole module (preamble + functions) *)
 let build_module fmap =
     let jit = optimizing_jit_compiler in
     let globals = build_module_preamble jit in
@@ -429,6 +444,7 @@ let build_module fmap =
     eval_dd m [|2.; 3.5|] ret;
     Printf.printf "(%f, %f)\n%!" ret.(0) ret.(1)*)
 
+(* read function pointer from module; this does the actual compiling if neccessary *)
 let get_pointer name =
     let jit = optimizing_jit_compiler in
     let Some(func) = lookup_function name jit.the_module in
