@@ -14,11 +14,13 @@ Dependencies
  * core (opam package)
  * core_bench (opam package)
  * smart_print (opam package)
+ * llvm (library, see: http://llvm.org/releases/)
+ * llvm (opam package, requires llvm library already installed on system)
 
 You can install the OCaml dependencies running:
 
 ```sh
-  opam install core core_bench smart_print kaputt oasis
+  opam install core core_bench smart_print kaputt oasis llvm
 ```
 
 Building
@@ -51,4 +53,9 @@ After building the tests are run via (assuming native compilation is supported o
   ./e2test.native
 ```
 
+Or
+
+```sh
+   make test
+ ```
 
