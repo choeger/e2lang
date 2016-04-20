@@ -32,7 +32,7 @@ open E2poly
 
 let test_proto = { ivars = 4; bvars = 1; dvars =0; fvars=0; args=[| |]; ret=IRet }
 
-let meta = { order = 0; params = 0 }
+let meta = { order = 0; params = 1 }
 
 let empty_procs = StrMap.empty
 
@@ -72,6 +72,7 @@ let test_fac = [|
     Label ("Ret") ;
     Ret (  IArg 1)
   |]
+
 
 (** Some Polynomials *)
 let test_polynomials = [
@@ -119,7 +120,7 @@ let eval_test () = eval_method meta test_method [||]
 
 let eval_fac n = eval_method meta fac_method [| IVal n |]
 
-let eval_poly1 f = eval_method meta poly1_method [| FVal f |]
+let eval_poly1 f = eval_method meta poly1_method [| DVal [| f ; 1.0 |] |]
 let eval_poly2 f1 f2 = eval_method meta poly2_method [| FVal f1; FVal f2 |]
 let eval_poly3 f1 f2 f3 = eval_method meta poly3_method [| FVal f1; FVal f2; FVal f3 |]
 let eval_poly4 f1 f2 = eval_method meta poly4_method [| FVal f1; FVal f2 |]

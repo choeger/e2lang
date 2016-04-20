@@ -140,36 +140,36 @@ and simplify = function
  *)
 let rec simplify_fix p = let s = simplify p in if s = p then p else simplify_fix s
 
-
+(* Compilation of i^n to e2lang statements *)
 let pow_to_e2 i n c =
-    let rec pow i n c =
-        if n = 0
+    let rec pow i n c = if n = 0
         then [| |]
-        else Array.append [| Store (FArg c, FMul (FloatVar i, FloatVar c)) |] (pow i (n-1) c)
+        else Array.append [| Store (DArg c, DMul (i, c)) |] (pow i (n-1) c)
     in
-    Array.append [| Store (FArg c, FCopy (FloatLit 1.0))|] (pow i n c)
+    Array.append [| Store (DArg c, DLoadF (FloatLit 1.0))|] (pow i n c)
 
+(* Polynom to e2lang compilation *)
 let rec poly_to_e2_stmts c = function
-    | Number f -> ([| Store (FArg c, FCopy (FloatLit f)) |], c+1)
+    | Number f -> ([| Store (DArg c, DLoadF (FloatLit f)) |], c+1)
     | Variable (i, n, p, qs) ->
-            let powArr = pow_to_e2 i n c in
+            let powArr = [| Store(DArg c, DPwr (IntLit n, i)) |] (* pow_to_e2 i n c*) in
             match poly_to_e2_stmts (c+1) p with
             | (pArr, c') ->
-                    let multArr = [| Store (FArg c', FMul (FloatVar c, FloatVar (c'-1))) |] in
+                    let multArr = [| Store (DArg c', DMul (c,(c'-1))) |] in
                     let firstArr = Array.concat [powArr; pArr; multArr] in
                     match build_sum (c'+1) qs with
                     | (lastArr, c'') ->
-                            let sumArr = [| Store (FArg c'', FAdd (FloatVar c', FloatVar (c''-1))) |] in
+                            let sumArr = [| Store (DArg c'', DAdd (c',(c''-1))) |] in
                             (Array.concat [firstArr; lastArr; sumArr], c''+1)
-
+(* Transformation of all polynoms in the list qs to e2lang *)
 and build_sum c = function
-    | [] -> ([| Store (FArg c, FCopy (FloatLit 0.) )|], c+1)
+    | [] -> ([| Store (DArg c, DLoadF (FloatLit 0.) )|], c+1)
     | p :: ps ->
             match (poly_to_e2_stmts c p) with
             | (pArr, c') ->
                     match build_sum c' ps with
                     | (psArr, c'') ->
-                            let addArr = [| Store (FArg c'', FAdd (FloatVar (c'-1), FloatVar (c''-1))) |] in
+                            let addArr = [| Store (DArg c'', DAdd ((c'-1), (c''-1))) |] in
                             (Array.concat [pArr; psArr; addArr], c''+1)
             (*buildPow i n >>= fun arr1 ->
             lastVar >>= fun c1 ->
@@ -178,11 +178,12 @@ and build_sum c = function
             buildMul c1 c2 >>= fun arr3 ->
             return (Array.append (Array.append arr1 arr2) arr3)*)
 
+(* Compilation of a polynom to e2 and prototype initialization *)
 let poly_to_e2 p n =
-    let rec argList m n = if m == n then [FArg n] else (FArg m) :: (argList (m+1) n) in
+    let rec argList m n = if m == n then [DArg n] else (DArg m) :: (argList (m+1) n) in
     match poly_to_e2_stmts n p with
     | (stmts, cnt) ->
             let argArr = Array.of_list (argList 0 (n-1)) in
-            let proto = { ivars = 0; bvars = 0; dvars = 0; fvars = cnt; args = argArr; ret=FRet } in
-            let ret = [| Ret (FArg (cnt-1)) |] in
+            let proto = { ivars = 0; bvars = 0; dvars = cnt; fvars = 0; args = argArr; ret=DRet } in
+            let ret = [| Ret (DArg (cnt-1)) |] in
             Proc (proto, Array.append stmts ret)

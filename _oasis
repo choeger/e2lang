@@ -15,8 +15,8 @@ Library e2lang
   Path:       src
   CompiledObject: best
   BuildTools:   ocamlbuild
-  Modules:      E2lang, E2link, E2intpr, E2pretty, E2poly, E2jit
-  BuildDepends: smart_print, llvm, llvm.analysis, llvm.executionengine, llvm.target, llvm.scalar_opts
+  Modules:      E2lang, E2link, E2intpr, E2pretty, E2poly, E2jit, E2basicblock, E2liveness, E2optimize
+  BuildDepends: ocamlgraph, batteries, smart_print, llvm, llvm.analysis, llvm.executionengine, llvm.target, llvm.scalar_opts
   CSources:     e2llvm.c
   
 Executable e2bench
@@ -52,3 +52,12 @@ Executable e2tests
 Test e2test
   Type: custom (0.3)
   Command: $e2tests
+
+Executable e2main
+  Path: src
+  CompiledObject: best
+  MainIs: e2main.ml
+  Install: false
+  CCLib: -ltnp
+  DllLib: libtnp
+  BuildDepends: e2lang
