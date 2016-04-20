@@ -29,6 +29,11 @@ open E2test_methods
 open E2lang
 open E2poly
 open Kaputt.Abbreviations
+open E2jit
+open E2intpr
+open E2basicblock
+
+external twoInts : int -> int -> unit = "ints"
 
 (** Output provider for test results (to see the actual result if something went wrong *)
 let print_val = function
@@ -41,13 +46,24 @@ let print_val = function
 
 let faculty_identity (a, IVal(b)) = (fac a) = b
 
-let poly1_id (a, FVal(b)) = (eval_poly [|a|] poly1) = b
+let approx f1 f2 =
+    let fabs f = if f < 0. then -1. *. f else f in
+    fabs (f1 -. f2) < 0.001
+
+let poly1_id (a, DVal(b)) = ((eval_poly [|a|] poly1) = b.(0)) && (approx (2. *. a) b.(1))
 let poly2_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly2) = b
 let poly3_id ((a1, a2, a3), FVal(b)) = (eval_poly [|a1; a2; a3|] poly3) = b
 let poly4_id ((a1, a2), FVal(b)) = (eval_poly [|a1; a2|] poly4) = b
 
+let proto = { ivars = 0; bvars = 0; dvars = 1; fvars = 0; args = [| DArg 0 |]; ret=DRet }
+let proc = Proc (proto, [| Ret (DArg 0) |])
+
 let () =
-  Printf.printf("Running...\n") ;
+  (*  twoInts 1 2;
+    test_tnp_constant () ;
+    build_test "fac" (Proc (fac_proto, test_fac));*)
+  (*build_module (proto, build ([| Ret (DArg 0) |]));
+  Printf.printf("Running...\n") ;*)
   (* simple tests are provided using this syntax: *)
   Test.add_simple_test
     ~title:"counting loop" (* test name *)
@@ -67,9 +83,9 @@ let () =
     ~title:"fac(2)"
     (fun () -> Assert.equal ~prn:print_val (IVal 2) (eval_fac 2));
 
-  Test.add_simple_test
+  (*Test.add_simple_test
     ~title:"poly1(0.1)"
-    (fun () -> Assert.equal ~prn:print_val (FVal (eval_poly [|0.1|] (List.nth test_polynomials 0))) (eval_poly1 0.1));
+    (fun () -> Assert.equal ~prn:print_val (FVal (eval_poly [|0.1|] (List.nth test_polynomials 0))) (eval_poly1 0.1));*)
   
   (* test a whole specification by enumerating over several inputs *)
   Test.add_enum_test
@@ -78,13 +94,13 @@ let () =
     (eval_fac)       (* test-method *)
     [Spec.always => faculty_identity]  (* specification as logical implication *);
   
-  Test.add_enum_test
+ Test.add_enum_test
     ~title:"poly1"
     (Enum.float (-1.0) (1.0) 50)
     (eval_poly1)
     [Spec.always => poly1_id];
 
-  Test.add_enum_test
+  (*Test.add_enum_test
     ~title:"poly2"
     (Enum.zip2 (Enum.float (-1.0) (1.0) 50) (Enum.float (-1.0) (1.0) 50))
     (fun (a, b) -> eval_poly2 a b)
@@ -100,7 +116,7 @@ let () =
     ~title:"poly4"
     (Enum.zip2 (Enum.float (-1.0) (1.0) 50) (Enum.float (-1.0) (1.0) 50))
     (fun (a, b) -> eval_poly4 a b)
-    [Spec.always => poly4_id];
+    [Spec.always => poly4_id]; *)
 
   (* finally run our tests *)
   Test.launch_tests ()
